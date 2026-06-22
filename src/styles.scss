@@ -13,12 +13,18 @@
   --theme-ink: #3d3d3d;
 }
 
+html {
+  touch-action: manipulation;
+}
+
 html,
 body {
   height: 100%;
   background: var(--theme-cream);
   color: var(--theme-ink);
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -28,8 +34,19 @@ body {
 
 input,
 textarea,
+select,
 button {
   font-family: inherit;
+  touch-action: manipulation;
+}
+
+/* iOS Safari：輸入框字級 < 16px 聚焦時會自動放大 */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 input[type='number'] {
@@ -197,7 +214,7 @@ a:focus-visible {
 
   /* ── Forms ── */
   .input {
-    @apply w-full rounded-2xl bg-cream px-4 py-3 text-sm text-ink outline-none transition;
+    @apply w-full rounded-2xl bg-cream px-4 py-3 text-base text-ink outline-none transition md:text-sm;
     border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
   }
 
@@ -206,7 +223,7 @@ a:focus-visible {
   }
 
   .input-sm {
-    @apply rounded-xl bg-white px-3 py-2 text-sm text-ink outline-none transition;
+    @apply rounded-xl bg-white px-3 py-2 text-base text-ink outline-none transition md:text-sm;
     border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
   }
 
