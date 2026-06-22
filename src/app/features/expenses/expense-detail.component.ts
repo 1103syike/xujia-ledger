@@ -6,100 +6,115 @@ import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-expense-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, MemberAvatarComponent, SplitPieChartComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MemberAvatarComponent,
+    SplitPieChartComponent,
+    ConfirmDialogComponent,
+  ],
   template: `
-    <ng-container *ngIf="expense$ | async as expense">
-      <a routerLink="/expenses" class="mb-4 inline-block text-sm text-ink/50">
-        ← 返回
-      </a>
+    <div class="page" *ngIf="expense$ | async as expense">
+      <a routerLink="/expenses" class="back-link">← 返回</a>
 
-      <div class="card mb-4">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-xl font-bold">{{ expense.title }}</h2>
-            <p class="mt-1 text-sm text-ink/60">
+      <div class="card">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="section-title">{{ expense.title }}</h2>
+            <p class="helper-text mt-1">
               代墊 {{ auth.getMember(expense.payerId)?.name }}
               · {{ expense.splitMode === 'equal' ? '平分' : '細分' }}
             </p>
           </div>
-          <p class="text-xl font-bold">NT$ {{ expense.totalAmount }}</p>
+          <p class="amount-lg shrink-0">NT$ {{ expense.totalAmount }}</p>
         </div>
-        <p *ngIf="expense.note" class="mt-3 rounded-2xl bg-cream p-3 text-sm">
-          💬 {{ expense.note }}
+        <p *ngIf="expense.note" class="helper-text mt-3 inset-panel">
+          {{ expense.note }}
         </p>
       </div>
 
-      <div class="card mb-4">
-        <p class="mb-1 font-medium">分攤比例</p>
+      <div class="card-stack">
+        <p class="card-title">分攤比例</p>
         <app-split-pie-chart
           [slices]="expense.splits"
           [totalAmount]="expense.totalAmount"
+          [billTotal]="expense.billTotal ?? null"
         />
       </div>
 
-      <div class="card mb-4 space-y-3">
-        <p class="font-medium">分攤明細</p>
+      <div class="card-stack">
+        <p class="card-title">分攤明細</p>
         <div
           *ngFor="let split of expense.splits"
-          class="rounded-2xl bg-cream p-3"
+          class="inset-panel"
           [class.opacity-60]="split.amount === 0"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 body-text">
               <ng-container *ngIf="auth.getMember(split.memberId) as m">
                 <app-member-avatar [member]="m" />
                 <span>{{ m.name }}</span>
               </ng-container>
             </div>
             <div class="text-right">
-              <p *ngIf="split.amount === 0" class="font-medium text-ink/40">不用付</p>
-              <p *ngIf="split.amount > 0" class="font-bold">NT$ {{ split.amount }}</p>
+              <p *ngIf="split.amount === 0" class="caption-text">免分攤</p>
+              <p *ngIf="split.amount > 0" class="amount-md">NT$ {{ split.amount }}</p>
               <span
                 *ngIf="split.isRemainderBearer"
-                class="chip bg-coral/20 text-xs text-coral"
+                class="chip ml-1 bg-coral/20 text-coral"
               >
                 零頭 +{{ split.remainderAmount }}
               </span>
             </div>
           </div>
-          <p *ngIf="split.note" class="mt-2 text-xs text-ink/50">
+          <div
+            *ngIf="split.items?.length"
+            class="mt-2 stack-sm border-t border-peach/15 pt-2"
+          >
+            <div
+              *ngFor="let item of split.items"
+              class="flex justify-between caption-text"
+            >
+              <span>{{ item.note }}</span>
+              <span>NT$ {{ item.amount }}</span>
+            </div>
+          </div>
+          <p *ngIf="split.note && !split.items?.length" class="caption-text mt-2">
             {{ split.note }}
           </p>
-          <p class="mt-2 text-xs" [ngClass]="statusClass(split.paymentStatus)">
+          <p class="caption-text mt-2" [ngClass]="statusClass(split.paymentStatus)">
             {{ statusLabel(split, expense.payerId) }}
           </p>
 
-          <div *ngIf="canMarkPaid(split, expense)" class="mt-2">
+          <div *ngIf="canMarkPaid(split, expense)" class="mt-3">
             <button
               type="button"
-              class="btn-primary w-full py-2 text-sm"
+              class="btn-primary btn-sm w-full"
               (click)="markPaid(expense.id)"
             >
-              我已付 NT$ {{ split.amount }}
+              標記已付款 NT$ {{ split.amount }}
             </button>
           </div>
 
-          <div
-            *ngIf="canConfirm(split, expense)"
-            class="mt-2 flex gap-2"
-          >
+          <div *ngIf="canConfirm(split, expense)" class="mt-3">
             <button
               type="button"
-              class="btn-primary flex-1 py-2 text-sm"
+              class="btn-primary btn-sm w-full"
               (click)="confirm(expense.id, split.memberId)"
             >
-              確認收到
+              確認收款
             </button>
           </div>
 
-          <div *ngIf="canUnconfirm(split, expense)" class="mt-2">
+          <div *ngIf="canUnconfirm(split, expense)" class="mt-3">
             <button
               type="button"
-              class="btn-secondary w-full py-2 text-sm"
+              class="btn-secondary btn-sm w-full"
               (click)="unconfirm(expense.id, split.memberId)"
             >
               撤銷確認
@@ -108,16 +123,39 @@ import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.
         </div>
       </div>
 
+      <div class="card-stack" *ngIf="expense.status === 'open'">
+        <a
+          [routerLink]="['/expenses', expense.id, 'edit']"
+          class="btn-secondary w-full text-center"
+        >
+          編輯帳款
+        </a>
+      </div>
+
       <button
+        *ngIf="expense.status === 'open'"
         type="button"
-        class="w-full rounded-2xl py-3 text-sm text-coral"
-        (click)="cancel(expense.id)"
+        class="btn-ghost-danger"
+        (click)="openRemoveDialog(expense)"
       >
-        移除此帳款
+        移除此筆帳款
       </button>
 
-      <p *ngIf="message" class="mt-3 text-center text-sm text-coral">{{ message }}</p>
-    </ng-container>
+      <app-confirm-dialog
+        [open]="removeDialogOpen"
+        title="移除此筆帳款"
+        [detail]="removeTargetTitle"
+        message="確定要移除此筆帳款嗎？移除後將無法復原，操作紀錄仍會保留。"
+        confirmLabel="確認移除"
+        cancelLabel="取消"
+        [destructive]="true"
+        [busy]="removeBusy"
+        (confirmed)="confirmRemove()"
+        (cancelled)="closeRemoveDialog()"
+      />
+
+      <p *ngIf="message" class="body-text text-center text-coral">{{ message }}</p>
+    </div>
   `,
 })
 export class ExpenseDetailComponent {
@@ -130,6 +168,10 @@ export class ExpenseDetailComponent {
   );
 
   message = '';
+  removeDialogOpen = false;
+  removeTargetId = '';
+  removeTargetTitle = '';
+  removeBusy = false;
 
   constructor(
     public auth: AuthService,
@@ -142,15 +184,15 @@ export class ExpenseDetailComponent {
     split: { memberId: string; paymentStatus: string; amount: number },
     payerId: string
   ): string {
-    if (split.amount === 0) return '— 不用付';
+    if (split.amount === 0) return '免分攤';
     if (split.memberId === payerId) return '代墊者';
     switch (split.paymentStatus) {
       case 'confirmed':
-        return '✅ 已結清';
+        return '已結清';
       case 'marked':
-        return '⏳ 待確認收款';
+        return '待確認收款';
       default:
-        return '💸 尚未標記已付';
+        return '尚未標記付款';
     }
   }
 
@@ -197,20 +239,43 @@ export class ExpenseDetailComponent {
   }
 
   async markPaid(id: string): Promise<void> {
-    this.message = (await this.expenses.markPaid(id)) ?? '已標記';
+    this.message = (await this.expenses.markPaid(id)) ?? '已成功標記付款';
   }
 
   async confirm(expenseId: string, debtorId: string): Promise<void> {
-    this.message = (await this.expenses.confirmPayment(expenseId, debtorId)) ?? '已確認';
+    this.message = (await this.expenses.confirmPayment(expenseId, debtorId)) ?? '已成功確認收款';
   }
 
   async unconfirm(expenseId: string, debtorId: string): Promise<void> {
-    this.message = (await this.expenses.unconfirmPayment(expenseId, debtorId)) ?? '已撤銷';
+    this.message = (await this.expenses.unconfirmPayment(expenseId, debtorId)) ?? '已撤銷確認';
   }
 
-  async cancel(id: string): Promise<void> {
-    if (!confirm('確定移除此帳款？')) return;
-    await this.expenses.cancelExpense(id);
+  openRemoveDialog(expense: { id: string; title: string }): void {
+    this.removeTargetId = expense.id;
+    this.removeTargetTitle = expense.title;
+    this.removeDialogOpen = true;
+  }
+
+  closeRemoveDialog(): void {
+    if (this.removeBusy) return;
+    this.removeDialogOpen = false;
+    this.removeTargetId = '';
+    this.removeTargetTitle = '';
+  }
+
+  async confirmRemove(): Promise<void> {
+    if (!this.removeTargetId || this.removeBusy) return;
+    this.removeBusy = true;
+    const err = await this.expenses.cancelExpense(this.removeTargetId);
+    this.removeBusy = false;
+
+    if (err) {
+      this.message = err;
+      this.closeRemoveDialog();
+      return;
+    }
+
+    this.removeDialogOpen = false;
     this.router.navigateByUrl('/expenses');
   }
 }

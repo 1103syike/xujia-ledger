@@ -19,10 +19,19 @@ import {
 } from '../models';
 import {
   buildSplitPreview,
+  mergeSplitsPreservingPayment,
   previewToSplits,
   validateCreateInput,
 } from '../utils/split-calculator';
+import { formatFirestoreError, stripUndefined } from '../utils/firestore-data';
 import { AuthService } from './auth.service';
+
+function memberName(
+  auth: AuthService,
+  id: string
+): string {
+  return auth.getMember(id)?.name ?? id;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ExpenseService implements OnDestroy {
@@ -62,20 +71,21 @@ export class ExpenseService implements OnDestroy {
 
   async createExpense(input: CreateExpenseInput): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
     const error = validateCreateInput(input, this.auth.getAllMembers());
     if (error) return error;
 
     const seed = crypto.randomUUID?.() ?? `${Date.now()}`;
     const preview = buildSplitPreview({ ...input, remainderSeed: seed }, this.auth.getAllMembers());
-    const splits = previewToSplits(preview, input.splitNotes);
+    const splits = previewToSplits(preview, input.splitNotes, input.splitItems);
     const now = new Date().toISOString();
 
     const expense: Expense = {
       id: seed,
       title: input.title.trim(),
       totalAmount: input.totalAmount,
+      billTotal: input.billTotal ?? null,
       payerId: input.payerId,
       participantScope: input.participantScope,
       participantIds:
@@ -94,25 +104,136 @@ export class ExpenseService implements OnDestroy {
     };
 
     try {
-      await setDoc(doc(firestoreDb, 'expenses', expense.id), expense);
+      await setDoc(
+        doc(firestoreDb, 'expenses', expense.id),
+        stripUndefined(expense)
+      );
       await this.addAudit({
         actorId: actor.id,
         action: 'expense.created',
         entityType: 'expense',
         entityId: expense.id,
-        payload: { title: expense.title },
+        payload: stripUndefined({
+          title: expense.title,
+          totalAmount: expense.totalAmount,
+          payerId: expense.payerId,
+          payerName: memberName(this.auth, expense.payerId),
+          splitMode: expense.splitMode,
+          note: expense.note,
+          splits: expense.splits.map((s) => ({
+            memberId: s.memberId,
+            name: memberName(this.auth, s.memberId),
+            amount: s.amount,
+            items: s.items,
+          })),
+        }),
       });
       return null;
-    } catch {
-      return '建立失敗，請確認 Firestore 權限';
+    } catch (error) {
+      console.error('createExpense failed', error);
+      return formatFirestoreError(error);
+    }
+  }
+
+  async updateExpense(
+    expenseId: string,
+    input: CreateExpenseInput
+  ): Promise<string | null> {
+    const actor = this.auth.currentMember;
+    if (!actor) return '請先登入帳號';
+
+    const existing = this.expenses.find((e) => e.id === expenseId);
+    if (!existing) return '找不到此筆帳款';
+    if (existing.status !== 'open') return '此筆帳款已移除，無法編輯';
+
+    const error = validateCreateInput(input, this.auth.getAllMembers());
+    if (error) return error;
+
+    const seed = input.remainderSeed ?? expenseId;
+    const preview = buildSplitPreview(
+      { ...input, remainderSeed: seed },
+      this.auth.getAllMembers()
+    );
+    const freshSplits = previewToSplits(
+      preview,
+      input.splitNotes,
+      input.splitItems
+    );
+    const splits = mergeSplitsPreservingPayment(existing.splits, freshSplits);
+    const now = new Date().toISOString();
+
+    const updated: Expense = {
+      ...existing,
+      title: input.title.trim(),
+      totalAmount: input.totalAmount,
+      billTotal: input.billTotal ?? null,
+      payerId: input.payerId,
+      participantScope: input.participantScope,
+      participantIds:
+        input.participantScope === 'all'
+          ? this.auth.getAllMembers().map((m) => m.id)
+          : [...input.participantIds],
+      splitMode: input.splitMode,
+      note: input.note?.trim() || null,
+      remainderBearerId: preview.remainderBearerId,
+      remainderAmount: preview.remainderAmount,
+      updatedAt: now,
+      splits,
+    };
+
+    try {
+      await updateDoc(
+        doc(firestoreDb, 'expenses', expenseId),
+        stripUndefined({
+          title: updated.title,
+          totalAmount: updated.totalAmount,
+          billTotal: updated.billTotal,
+          payerId: updated.payerId,
+          participantScope: updated.participantScope,
+          participantIds: updated.participantIds,
+          splitMode: updated.splitMode,
+          note: updated.note,
+          remainderBearerId: updated.remainderBearerId,
+          remainderAmount: updated.remainderAmount,
+          updatedAt: updated.updatedAt,
+          splits: updated.splits,
+        })
+      );
+      await this.addAudit({
+        actorId: actor.id,
+        action: 'expense.updated',
+        entityType: 'expense',
+        entityId: expenseId,
+        payload: stripUndefined({
+          title: updated.title,
+          totalAmount: updated.totalAmount,
+          payerId: updated.payerId,
+          payerName: memberName(this.auth, updated.payerId),
+          splitMode: updated.splitMode,
+          note: updated.note,
+          previousTitle: existing.title,
+          previousTotalAmount: existing.totalAmount,
+          splits: updated.splits.map((s) => ({
+            memberId: s.memberId,
+            name: memberName(this.auth, s.memberId),
+            amount: s.amount,
+            items: s.items,
+          })),
+        }),
+      });
+      return null;
+    } catch (error) {
+      console.error('updateExpense failed', error);
+      return formatFirestoreError(error);
     }
   }
 
   async cancelExpense(expenseId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
-    if (!this.expenses.find((e) => e.id === expenseId)) return '找不到帳款';
+    const expense = this.expenses.find((e) => e.id === expenseId);
+    if (!expense) return '找不到此筆帳款';
 
     try {
       await updateDoc(doc(firestoreDb, 'expenses', expenseId), {
@@ -124,57 +245,60 @@ export class ExpenseService implements OnDestroy {
         action: 'expense.cancelled',
         entityType: 'expense',
         entityId: expenseId,
-        payload: {},
+        payload: {
+          title: expense.title,
+          totalAmount: expense.totalAmount,
+        },
       });
       return null;
     } catch {
-      return '取消失敗';
+      return '移除失敗，請稍後再試';
     }
   }
 
   async markPaid(expenseId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
     const expense = this.expenses.find((e) => e.id === expenseId && e.status === 'open');
-    if (!expense) return '找不到帳款';
+    if (!expense) return '找不到此筆帳款';
 
     const split = expense.splits.find((s) => s.memberId === actor.id);
-    if (!split) return '你不在分攤名單中';
-    if (actor.id === expense.payerId) return '代墊者不需標記繳款';
-    if (split.amount <= 0) return '此筆不需付款';
-    if (split.paymentStatus === 'confirmed') return '已結清';
-    if (split.paymentStatus === 'marked') return '已標記';
+    if (!split) return '您不在此筆帳款的分攤名單中';
+    if (actor.id === expense.payerId) return '代墊者無需標記付款';
+    if (split.amount <= 0) return '此筆帳款無需付款';
+    if (split.paymentStatus === 'confirmed') return '此筆款項已結清';
+    if (split.paymentStatus === 'marked') return '您已標記付款，待代墊者確認';
 
     return this.applySplitUpdate(expenseId, actor.id, 'marked', 'payment.marked');
   }
 
   async confirmPayment(expenseId: string, debtorId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
     const expense = this.expenses.find((e) => e.id === expenseId && e.status === 'open');
-    if (!expense) return '找不到帳款';
-    if (expense.payerId !== actor.id) return '只有代墊者可確認收款';
+    if (!expense) return '找不到此筆帳款';
+    if (expense.payerId !== actor.id) return '僅代墊者可確認收款';
 
     const split = expense.splits.find((s) => s.memberId === debtorId);
-    if (!split) return '對象不符';
-    if (split.paymentStatus !== 'marked') return '對方尚未標記已付';
+    if (!split) return '找不到對應的分攤紀錄';
+    if (split.paymentStatus !== 'marked') return '對方尚未標記付款';
 
     return this.applySplitUpdate(expenseId, debtorId, 'confirmed', 'payment.confirmed');
   }
 
   async unconfirmPayment(expenseId: string, debtorId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
     const expense = this.expenses.find((e) => e.id === expenseId && e.status === 'open');
-    if (!expense) return '找不到帳款';
-    if (expense.payerId !== actor.id) return '只有代墊者可撤銷確認';
+    if (!expense) return '找不到此筆帳款';
+    if (expense.payerId !== actor.id) return '僅代墊者可撤銷確認';
 
     const split = expense.splits.find((s) => s.memberId === debtorId);
-    if (!split) return '對象不符';
-    if (split.paymentStatus !== 'confirmed') return '尚未確認收款';
+    if (!split) return '找不到對應的分攤紀錄';
+    if (split.paymentStatus !== 'confirmed') return '此筆款項尚未確認收款';
 
     return this.applySplitUpdate(expenseId, debtorId, 'marked', 'payment.unconfirmed');
   }
@@ -186,10 +310,10 @@ export class ExpenseService implements OnDestroy {
     action: string
   ): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入';
+    if (!actor) return '請先登入帳號';
 
     const expense = this.expenses.find((e) => e.id === expenseId);
-    if (!expense) return '找不到帳款';
+    if (!expense) return '找不到此筆帳款';
 
     const now = new Date().toISOString();
     const splits = expense.splits.map((split) => {
@@ -204,7 +328,7 @@ export class ExpenseService implements OnDestroy {
 
     try {
       await updateDoc(doc(firestoreDb, 'expenses', expenseId), {
-        splits,
+        splits: stripUndefined(splits),
         updatedAt: now,
       });
       await this.addAudit({
@@ -212,21 +336,30 @@ export class ExpenseService implements OnDestroy {
         action,
         entityType: 'expense',
         entityId: expenseId,
-        payload: { debtorId: targetMemberId, nextStatus },
+        payload: stripUndefined({
+          debtorId: targetMemberId,
+          debtorName: memberName(this.auth, targetMemberId),
+          title: expense.title,
+          amount: expense.splits.find((s) => s.memberId === targetMemberId)?.amount,
+          nextStatus,
+        }),
       });
       return null;
     } catch {
-      return '更新失敗';
+      return '更新失敗，請稍後再試';
     }
   }
 
   private async addAudit(
     partial: Omit<AuditLog, 'id' | 'createdAt'>
   ): Promise<void> {
-    await addDoc(collection(firestoreDb, 'auditLogs'), {
-      ...partial,
-      createdAt: new Date().toISOString(),
-    });
+    await addDoc(
+      collection(firestoreDb, 'auditLogs'),
+      stripUndefined({
+        ...partial,
+        createdAt: new Date().toISOString(),
+      })
+    );
   }
 
   private attachListeners(): void {

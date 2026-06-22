@@ -1,5 +1,6 @@
 import {
   CreateExpenseInput,
+  ExpenseLineItem,
   ExpenseSplit,
   Member,
 } from '../models';
@@ -54,13 +55,14 @@ function pickRemainderBearer(
   return candidates[index];
 }
 
-export function calculateEqualSplit(
+/** 在指定成員中平分（不含被排除者） */
+export function calculateEqualSplitAmong(
   totalAmount: number,
-  participantIds: string[],
+  payingIds: string[],
   payerId: string,
   seed: string
 ): SplitPreview {
-  const n = participantIds.length;
+  const n = payingIds.length;
   if (n === 0) {
     return { lines: [], total: 0, remainderBearerId: null, remainderAmount: 0 };
   }
@@ -68,11 +70,10 @@ export function calculateEqualSplit(
   const base = Math.floor(totalAmount / n);
   const remainder = totalAmount - base * n;
   const bearerId =
-    remainder > 0 ? pickRemainderBearer(participantIds, payerId, seed) : null;
+    remainder > 0 ? pickRemainderBearer(payingIds, payerId, seed) : null;
 
-  const lines: SplitPreviewLine[] = participantIds.map((memberId) => {
-    const extra =
-      bearerId && memberId === bearerId ? remainder : 0;
+  const lines: SplitPreviewLine[] = payingIds.map((memberId) => {
+    const extra = bearerId && memberId === bearerId ? remainder : 0;
     return {
       memberId,
       amount: base + extra,
@@ -86,6 +87,51 @@ export function calculateEqualSplit(
     total: lines.reduce((sum, line) => sum + line.amount, 0),
     remainderBearerId: bearerId,
     remainderAmount: remainder,
+  };
+}
+
+export function calculateEqualSplit(
+  totalAmount: number,
+  allParticipantIds: string[],
+  payerId: string,
+  seed: string,
+  excludedIds: Set<string> = new Set()
+): SplitPreview {
+  const payingIds = allParticipantIds.filter((id) => !excludedIds.has(id));
+  const payingPreview = calculateEqualSplitAmong(
+    totalAmount,
+    payingIds,
+    payerId,
+    seed
+  );
+  const payingMap = new Map(
+    payingPreview.lines.map((line) => [line.memberId, line])
+  );
+
+  const lines: SplitPreviewLine[] = allParticipantIds.map((memberId) => {
+    if (excludedIds.has(memberId)) {
+      return {
+        memberId,
+        amount: 0,
+        isRemainderBearer: false,
+        remainderAmount: 0,
+      };
+    }
+    return (
+      payingMap.get(memberId) ?? {
+        memberId,
+        amount: 0,
+        isRemainderBearer: false,
+        remainderAmount: 0,
+      }
+    );
+  });
+
+  return {
+    lines,
+    total: payingPreview.total,
+    remainderBearerId: payingPreview.remainderBearerId,
+    remainderAmount: payingPreview.remainderAmount,
   };
 }
 
@@ -113,42 +159,77 @@ export function buildSplitPreview(
   input: CreateExpenseInput,
   members: Member[]
 ): SplitPreview {
-  const participantIds =
+  const allParticipantIds =
     input.participantScope === 'all'
       ? members.map((m) => m.id)
       : input.participantIds;
+  const excluded = new Set(input.excludedMemberIds ?? []);
 
   if (input.splitMode === 'equal') {
     const seed = input.remainderSeed ?? `${input.title}-${Date.now()}`;
     return calculateEqualSplit(
       input.totalAmount,
-      participantIds,
+      allParticipantIds,
       input.payerId,
-      seed
+      seed,
+      excluded
     );
   }
 
   return calculateItemizedSplit(
     input.totalAmount,
-    participantIds,
+    allParticipantIds,
     input.manualAmounts ?? {}
   );
 }
 
+/** 編輯帳款時，若成員與金額未變則保留付款狀態 */
+export function mergeSplitsPreservingPayment(
+  existing: ExpenseSplit[],
+  incoming: ExpenseSplit[]
+): ExpenseSplit[] {
+  const byMember = new Map(existing.map((s) => [s.memberId, s]));
+
+  return incoming.map((split) => {
+    const prev = byMember.get(split.memberId);
+    if (!prev || prev.amount !== split.amount || prev.paymentStatus === 'unpaid') {
+      return split;
+    }
+    return {
+      ...split,
+      paymentStatus: prev.paymentStatus,
+      markedAt: prev.markedAt ?? null,
+      confirmedAt: prev.confirmedAt ?? null,
+    };
+  });
+}
+
 export function previewToSplits(
   preview: SplitPreview,
-  splitNotes?: Record<string, string | null>
+  splitNotes?: Record<string, string | null>,
+  splitItems?: Record<string, ExpenseLineItem[]>
 ): ExpenseSplit[] {
-  return preview.lines.map((line) => ({
-    memberId: line.memberId,
-    amount: line.amount,
-    note: splitNotes?.[line.memberId] ?? null,
-    paymentStatus: 'unpaid' as const,
-    isRemainderBearer: line.isRemainderBearer,
-    remainderAmount: line.remainderAmount,
-    markedAt: null,
-    confirmedAt: null,
-  }));
+  return preview.lines.map((line) => {
+    const items = splitItems?.[line.memberId];
+    const split: ExpenseSplit = {
+      memberId: line.memberId,
+      amount: line.amount,
+      note: splitNotes?.[line.memberId] ?? null,
+      paymentStatus: 'unpaid',
+      markedAt: null,
+      confirmedAt: null,
+    };
+
+    if (items?.length) {
+      split.items = items;
+    }
+    if (line.isRemainderBearer && line.remainderAmount > 0) {
+      split.isRemainderBearer = true;
+      split.remainderAmount = line.remainderAmount;
+    }
+
+    return split;
+  });
 }
 
 export function validateCreateInput(
@@ -159,26 +240,33 @@ export function validateCreateInput(
     return '請填寫項目名稱';
   }
   if (input.totalAmount <= 0) {
-    return '總金額需大於 0';
+    return '總金額必須大於 0';
   }
   if (!input.payerId) {
     return '請選擇代墊者';
   }
 
-  const participantIds =
+  const allParticipantIds =
     input.participantScope === 'all'
       ? members.map((m) => m.id)
       : input.participantIds;
 
-  if (participantIds.length === 0) {
-    return '至少選一位分攤者';
+  if (allParticipantIds.length === 0) {
+    return '請至少選擇一位分攤成員';
+  }
+
+  const excluded = new Set(input.excludedMemberIds ?? []);
+  const payingCount = allParticipantIds.filter((id) => !excluded.has(id)).length;
+
+  if (payingCount === 0) {
+    return '至少需要一位成員參與分攤';
   }
 
   const preview = buildSplitPreview(input, members);
 
   if (input.splitMode === 'equal') {
     if (preview.remainderAmount > 0 && !preview.remainderBearerId) {
-      return '平分僅有代墊者一人時無法分配零頭，請改細分或調整人數';
+      return '僅代墊者一人分攤時無法分配零頭，請標記其他成員免分攤';
     }
   }
 
@@ -187,11 +275,8 @@ export function validateCreateInput(
     if (Object.values(amounts).some((a) => a < 0)) {
       return '金額不可為負數';
     }
-    if (preview.total !== input.totalAmount) {
-      return `細分加總 ${preview.total} 需等於總額 ${input.totalAmount}`;
-    }
     if (!preview.lines.some((line) => line.amount > 0)) {
-      return '至少一人需有分攤金額';
+      return '請至少為一位成員新增消費項目';
     }
   }
 

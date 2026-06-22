@@ -14,24 +14,24 @@ import { MemberAvatarComponent } from './member-avatar.component';
   standalone: true,
   imports: [CommonModule, MemberAvatarComponent],
   template: `
-    <label class="block text-sm font-medium">{{ label }}</label>
+    <label class="field-label">{{ label }}</label>
 
     <button
       type="button"
-      class="mt-1 flex w-full items-center gap-3 rounded-2xl border border-peach/30 bg-cream px-4 py-3 text-left transition active:scale-[0.99]"
+      class="picker-trigger"
       (click)="open()"
       [attr.aria-expanded]="isOpen"
       aria-haspopup="listbox"
     >
       <ng-container *ngIf="selected; else empty">
         <app-member-avatar [member]="selected" size="md" />
-        <span class="flex-1 font-medium text-ink">{{ selected.name }}</span>
+        <span class="item-title flex-1">{{ selected.name }}</span>
       </ng-container>
       <ng-template #empty>
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-ink/30">
           ?
         </span>
-        <span class="flex-1 text-ink/40">請選擇</span>
+        <span class="caption-text flex-1">請選擇成員</span>
       </ng-template>
       <svg
         class="h-5 w-5 shrink-0 text-ink/35"
@@ -70,34 +70,34 @@ import { MemberAvatarComponent } from './member-avatar.component';
         </div>
 
         <div class="flex items-center justify-between px-5 pb-3 pt-2">
-          <h3 class="text-base font-bold text-ink">{{ label }}</h3>
+          <h3 class="sheet-title">{{ label }}</h3>
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-sm text-ink/50 active:bg-cream"
+            class="caption-text rounded-full px-3 py-1 active:bg-cream"
             (click)="close()"
           >
             關閉
           </button>
         </div>
 
-        <ul class="max-h-[50vh] space-y-1 overflow-y-auto px-3 pb-4" role="listbox">
+        <ul class="max-h-[50vh] stack-sm overflow-y-auto px-3 pb-4" role="listbox">
           <li *ngFor="let m of members" role="option" [attr.aria-selected]="m.id === value">
             <button
               type="button"
-              class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition active:scale-[0.99]"
-              [ngClass]="{
-                'bg-peach-15': m.id === value,
-                'ring-1 ring-peach-40': m.id === value
-              }"
+              class="flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-3 text-left transition active:scale-[0.99]"
+              [class.border-peach]="m.id === value"
+              [class.bg-peach-15]="m.id === value"
+              [class.border-transparent]="m.id !== value"
               (click)="pick(m.id)"
             >
-              <app-member-avatar [member]="m" size="lg" />
-              <span class="flex-1 font-medium text-ink">{{ m.name }}</span>
+              <app-member-avatar [member]="m" size="md" />
+              <span class="item-title min-w-0 flex-1">{{ m.name }}</span>
               <span
-                *ngIf="m.id === value"
-                class="flex h-6 w-6 items-center justify-center rounded-full bg-peach text-xs text-white"
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs"
+                [class.bg-peach]="m.id === value"
+                [class.text-white]="m.id === value"
               >
-                ✓
+                <span *ngIf="m.id === value">✓</span>
               </span>
             </button>
           </li>

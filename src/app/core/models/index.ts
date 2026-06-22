@@ -22,9 +22,15 @@ export interface Member {
   loginEmail: string;
 }
 
+export interface ExpenseLineItem {
+  note: string;
+  amount: number;
+}
+
 export interface ExpenseSplit {
   memberId: string;
   amount: number;
+  items?: ExpenseLineItem[];
   note?: string | null;
   paymentStatus: PaymentStatus;
   isRemainderBearer?: boolean;
@@ -37,11 +43,13 @@ export interface Expense {
   id: string;
   title: string;
   totalAmount: number;
+  billTotal?: number | null;
   payerId: string;
   participantScope: ParticipantScope;
   participantIds: string[];
   splitMode: SplitMode;
   note?: string | null;
+  lineItems?: ExpenseLineItem[];
   remainderBearerId?: string | null;
   remainderAmount?: number;
   status: ExpenseStatus;
@@ -70,13 +78,16 @@ export interface BalanceEdge {
 export interface CreateExpenseInput {
   title: string;
   totalAmount: number;
+  billTotal?: number | null;
   payerId: string;
   participantScope: ParticipantScope;
   participantIds: string[];
   splitMode: SplitMode;
   note?: string | null;
+  splitItems?: Record<string, ExpenseLineItem[]>;
   manualAmounts?: Record<string, number>;
   splitNotes?: Record<string, string | null>;
+  excludedMemberIds?: string[];
   remainderSeed?: string;
 }
 

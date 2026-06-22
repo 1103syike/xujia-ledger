@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
@@ -17,30 +17,73 @@ import { MemberAvatarComponent } from '../shared/components/member-avatar.compon
   ],
   template: `
     <div class="mx-auto flex min-h-full max-w-md flex-col bg-cream pb-20">
-      <header class="sticky top-0 z-10 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div class="card flex items-center gap-3 py-3">
-          <ng-container *ngIf="auth.currentMember as member">
-            <a routerLink="/settings" class="flex min-w-0 flex-1 items-center gap-3">
-              <app-member-avatar [member]="member" size="lg" />
-              <div class="min-w-0">
-                <p class="truncate text-base font-bold text-ink">
+      <header
+        class="sticky top-0 z-10 transition-[background-color,box-shadow,border-color] duration-200"
+        [ngClass]="
+          headerCompact
+            ? 'border-b border-peach/20 bg-white/95 shadow-sm'
+            : 'bg-cream/90 backdrop-blur-md'
+        "
+      >
+        <div
+          class="px-4 transition-[padding] duration-200"
+          [class.pt-[max(0.5rem,env(safe-area-inset-top))]]="headerCompact"
+          [class.pt-[max(1rem,env(safe-area-inset-top))]]="!headerCompact"
+          [class.pb-3]="!headerCompact"
+        >
+          <div
+            class="flex w-full items-center gap-2 transition-[padding,background-color,border-radius,box-shadow] duration-200"
+            [class.min-h-10]="headerCompact"
+            [class.card]="!headerCompact"
+            [class.gap-3]="!headerCompact"
+            [class.py-3]="!headerCompact"
+          >
+            <ng-container *ngIf="auth.currentMember as member">
+              <app-member-avatar
+                class="shrink-0"
+                [member]="member"
+                [size]="headerCompact ? 'sm' : 'lg'"
+              />
+              <div
+                class="min-w-0 flex-1"
+                [class.flex]="headerCompact"
+                [class.items-center]="headerCompact"
+              >
+                <p
+                  class="truncate font-bold leading-none text-ink transition-[font-size] duration-200"
+                  [class.text-sm]="headerCompact"
+                  [class.text-base]="!headerCompact"
+                >
                   {{ displayNameOf(member) }}
                 </p>
-                <p class="text-xs text-ink/45">點我進設定</p>
+                <p
+                  *ngIf="!headerCompact"
+                  class="mt-1 text-xs leading-none text-ink/45"
+                >
+                  許家帳本
+                </p>
               </div>
-            </a>
-            <a
-              routerLink="/settings"
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cream text-lg"
-              aria-label="設定"
-            >
-              ⚙️
-            </a>
-          </ng-container>
+              <a
+                routerLink="/settings"
+                class="inline-flex shrink-0 items-center justify-center leading-none transition-[width,height,font-size,background-color,border-radius] duration-200 active:scale-95"
+                [class.h-8]="headerCompact"
+                [class.w-8]="headerCompact"
+                [class.text-base]="headerCompact"
+                [class.h-10]="!headerCompact"
+                [class.w-10]="!headerCompact"
+                [class.rounded-2xl]="!headerCompact"
+                [class.bg-cream]="!headerCompact"
+                [class.text-lg]="!headerCompact"
+                aria-label="設定"
+              >
+                ⚙️
+              </a>
+            </ng-container>
+          </div>
         </div>
       </header>
 
-      <main class="flex-1 px-4">
+      <main class="flex-1 px-4 pt-3">
         <router-outlet />
       </main>
 
@@ -89,6 +132,23 @@ import { MemberAvatarComponent } from '../shared/components/member-avatar.compon
 })
 export class MobileShellComponent {
   displayNameOf = displayNameOf;
+  headerCompact = false;
+
+  /** 收起門檻（往下捲超過此值才收合） */
+  private readonly collapseAt = 72;
+  /** 展開門檻（往上捲回到此值以下才展開，與收起分開避免抖動） */
+  private readonly expandAt = 12;
 
   constructor(public auth: AuthService) {}
+
+  @HostListener('window:scroll')
+  onScroll(): void {
+    const y = window.scrollY;
+
+    if (!this.headerCompact && y > this.collapseAt) {
+      this.headerCompact = true;
+    } else if (this.headerCompact && y < this.expandAt) {
+      this.headerCompact = false;
+    }
+  }
 }

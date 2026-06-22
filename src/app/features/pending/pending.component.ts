@@ -12,45 +12,47 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
   standalone: true,
   imports: [CommonModule, RouterLink, MemberAvatarComponent],
   template: `
-    <h2 class="mb-4 text-lg font-bold">待確認收款</h2>
-
-    <ng-container *ngIf="items$ | async as items">
-      <div *ngIf="items.length === 0" class="card text-center text-sm text-ink/50">
-        <p class="text-2xl">🌈</p>
-        <p class="mt-2">目前沒有待確認的款項～</p>
+    <div class="page">
+      <div class="page-title-bar">
+        <h2 class="page-title">待確認收款</h2>
       </div>
 
-      <div class="space-y-3">
-        <div *ngFor="let item of items" class="card">
-          <div class="flex items-center justify-between">
+      <ng-container *ngIf="items$ | async as items">
+        <div *ngIf="items.length === 0" class="empty-state">
+          <p class="empty-state__icon">🌈</p>
+          <p class="empty-state__text">目前沒有待確認的款項</p>
+        </div>
+
+        <div class="list-stack">
+          <div *ngFor="let item of items" class="card-stack">
             <div>
-              <p class="font-bold">{{ item.expense.title }}</p>
-              <div class="mt-1 flex items-center gap-2 text-sm">
+              <p class="item-title">{{ item.expense.title }}</p>
+              <div class="mt-1 flex items-center gap-2 body-text">
                 <ng-container *ngIf="auth.getMember(item.split.memberId) as m">
                   <app-member-avatar [member]="m" />
-                  <span>{{ m.name }} 已付 NT$ {{ item.split.amount }}</span>
+                  <span>{{ m.name }} 已付款 NT$ {{ item.split.amount }}</span>
                 </ng-container>
               </div>
             </div>
-          </div>
-          <div class="mt-3 flex gap-2">
-            <button
-              type="button"
-              class="btn-primary flex-1 py-2 text-sm"
-              (click)="confirm(item.expense.id, item.split.memberId)"
-            >
-              確認收到
-            </button>
-            <a
-              [routerLink]="['/expenses', item.expense.id]"
-              class="btn-secondary flex-1 py-2 text-center text-sm"
-            >
-              詳情
-            </a>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="btn-primary btn-sm flex-1"
+                (click)="confirm(item.expense.id, item.split.memberId)"
+              >
+                確認收款
+              </button>
+              <a
+                [routerLink]="['/expenses', item.expense.id]"
+                class="btn-secondary btn-sm flex-1 text-center"
+              >
+                查看詳情
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    </ng-container>
+      </ng-container>
+    </div>
   `,
 })
 export class PendingComponent {

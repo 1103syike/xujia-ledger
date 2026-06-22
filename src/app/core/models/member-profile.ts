@@ -23,7 +23,7 @@ const PEACH_SODA: ThemePreset = {
   id: 'peach-soda',
   name: '蜜桃汽水',
   emoji: '🍑',
-  description: '暖桃粉 × 奶油白，像碳酸飲料一樣甜',
+  description: '暖桃粉與奶油白，溫暖而明亮',
   colors: {
     peach: '#FFB5A7',
     cream: '#FFF8F0',
@@ -38,7 +38,7 @@ const MINT_DAY: ThemePreset = {
   id: 'mint-day',
   name: '薄荷午後',
   emoji: '🌿',
-  description: '薄荷綠 × 冰涼白，清爽像夏天',
+  description: '薄荷綠與冰涼白，清新而舒適',
   colors: {
     peach: '#6ECFAD',
     cream: '#F2FBF7',
@@ -53,7 +53,7 @@ const LAVENDER_MOON: ThemePreset = {
   id: 'lavender-moon',
   name: '薰衣草月夜',
   emoji: '🌙',
-  description: '淡紫 × 霧白，溫柔像傍晚天空',
+  description: '淡紫與霧白，柔和而寧靜',
   colors: {
     peach: '#C4B5FD',
     cream: '#F7F5FF',

@@ -107,7 +107,7 @@ export class MemberProfileService implements OnDestroy {
       await updateDoc(doc(firestoreDb, 'memberProfiles', memberId), payload);
       return null;
     } catch {
-      return '儲存失敗';
+      return '儲存失敗，請稍後再試';
     }
   }
 

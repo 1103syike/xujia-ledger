@@ -32,6 +32,22 @@ button {
   font-family: inherit;
 }
 
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-amount {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 a {
   -webkit-tap-highlight-color: transparent;
 }
@@ -46,23 +62,202 @@ a:focus-visible {
 }
 
 @layer components {
+  /* ── Layout ── */
+  .page {
+    @apply flex flex-col gap-4 pb-8;
+  }
+
+  /** 各分頁頂部大標列：固定高度，切換 tab 時不跳動 */
+  .page-title-bar {
+    @apply flex min-h-11 shrink-0 items-center justify-between gap-3;
+  }
+
+  .page-title-bar .page-title {
+    @apply min-w-0 truncate;
+  }
+
+  .page-title-bar__aside {
+    @apply flex shrink-0 items-center;
+  }
+
+  .page-header {
+    @apply page-title-bar;
+  }
+
+  .section {
+    @apply flex flex-col gap-3;
+  }
+
+  .section-header {
+    @apply flex items-center justify-between gap-3;
+  }
+
+  .stack-sm {
+    @apply flex flex-col gap-2;
+  }
+
+  .stack-md {
+    @apply flex flex-col gap-3;
+  }
+
+  .stack-lg {
+    @apply flex flex-col gap-4;
+  }
+
+  .list-stack {
+    @apply flex flex-col gap-3;
+  }
+
+  /* ── Typography ── */
+  .page-title {
+    @apply text-lg font-bold leading-tight tracking-tight text-ink;
+  }
+
+  .section-title {
+    @apply text-base font-bold leading-snug text-ink;
+  }
+
+  .card-title {
+    @apply text-sm font-bold leading-snug text-ink;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium;
+    color: color-mix(in srgb, var(--theme-ink) 70%, transparent);
+  }
+
+  .field-group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .helper-text {
+    @apply text-xs leading-relaxed;
+    color: color-mix(in srgb, var(--theme-ink) 50%, transparent);
+  }
+
+  .body-text {
+    @apply text-sm leading-relaxed text-ink;
+  }
+
+  .caption-text {
+    @apply text-xs leading-relaxed;
+    color: color-mix(in srgb, var(--theme-ink) 45%, transparent);
+  }
+
+  .item-title {
+    @apply text-sm font-bold leading-snug text-ink;
+  }
+
+  .amount-md {
+    @apply text-base font-bold tabular-nums text-ink;
+  }
+
+  .amount-lg {
+    @apply text-lg font-bold tabular-nums text-ink;
+  }
+
+  .amount-highlight {
+    @apply text-base font-bold tabular-nums text-coral;
+  }
+
+  .text-link {
+    @apply text-sm font-medium text-coral;
+  }
+
+  .back-link {
+    @apply inline-block text-sm;
+    color: color-mix(in srgb, var(--theme-ink) 50%, transparent);
+  }
+
+  /* ── Surfaces ── */
   .card {
     @apply rounded-3xl bg-white p-4 shadow-sm;
   }
 
+  .card-stack {
+    @apply card flex flex-col gap-3;
+  }
+
+  .inset-panel {
+    @apply rounded-2xl bg-cream p-3;
+  }
+
+  .empty-state {
+    @apply card text-center;
+  }
+
+  .empty-state__icon {
+    @apply text-2xl leading-none;
+  }
+
+  .empty-state__text {
+    @apply mt-2 text-sm;
+    color: color-mix(in srgb, var(--theme-ink) 50%, transparent);
+  }
+
+  /* ── Forms ── */
+  .input {
+    @apply w-full rounded-2xl bg-cream px-4 py-3 text-sm text-ink outline-none transition;
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  }
+
+  .input:focus {
+    border-color: var(--theme-peach);
+  }
+
+  .input-sm {
+    @apply rounded-xl bg-white px-3 py-2 text-sm text-ink outline-none transition;
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  }
+
+  .input-sm:focus {
+    border-color: var(--theme-peach);
+  }
+
+  .textarea {
+    @apply input resize-none;
+  }
+
+  .mode-chip {
+    @apply rounded-2xl px-4 py-2 text-sm font-medium;
+  }
+
+  .picker-trigger {
+    @apply mt-1 flex w-full items-center gap-3 rounded-2xl bg-cream px-4 py-3 text-left transition active:scale-[0.99];
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  }
+
+  .sheet-title {
+    @apply text-base font-bold leading-snug text-ink;
+  }
+
+  /* ── Buttons ── */
   .btn-primary {
-    @apply rounded-2xl px-6 py-3 font-medium text-white shadow-sm transition active:scale-95;
+    @apply rounded-2xl px-6 py-3 text-sm font-medium text-white shadow-sm transition active:scale-95;
     background-color: var(--theme-peach);
   }
 
   .btn-secondary {
-    @apply rounded-2xl bg-white px-6 py-3 font-medium shadow-sm transition active:scale-95;
+    @apply rounded-2xl bg-white px-6 py-3 text-sm font-medium shadow-sm transition active:scale-95;
     color: var(--theme-ink);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-peach) 30%, transparent);
   }
 
+  .btn-sm {
+    @apply px-4 py-2;
+  }
+
+  .btn-ghost-danger {
+    @apply w-full rounded-2xl py-3 text-sm font-medium text-coral transition active:scale-[0.99];
+  }
+
+  .btn-danger {
+    @apply rounded-2xl px-6 py-3 text-sm font-medium text-white shadow-sm transition active:scale-95;
+    background-color: var(--theme-coral);
+  }
+
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm;
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs;
   }
 
   .sheet-panel {
@@ -91,6 +286,10 @@ a:focus-visible {
     background-color: var(--theme-lavender);
   }
 
+  .bg-coral {
+    background-color: var(--theme-coral);
+  }
+
   .text-coral {
     color: var(--theme-coral);
   }
@@ -105,6 +304,10 @@ a:focus-visible {
 
   .border-peach\/30 {
     border-color: color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  }
+
+  .border-peach {
+    border-color: var(--theme-peach);
   }
 
   .border-peach\/20 {
@@ -139,4 +342,29 @@ a:focus-visible {
   to {
     transform: translateY(0);
   }
+}
+
+@keyframes loading-bar-slide {
+  0% {
+    width: 8%;
+    margin-left: 0;
+  }
+  50% {
+    width: 72%;
+    margin-left: 14%;
+  }
+  100% {
+    width: 8%;
+    margin-left: 92%;
+  }
+}
+
+.loading-bar {
+  background: linear-gradient(
+    90deg,
+    var(--theme-peach),
+    var(--theme-coral),
+    var(--theme-lavender)
+  );
+  animation: loading-bar-slide 1.35s ease-in-out infinite;
 }

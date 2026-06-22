@@ -36,6 +36,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'expenses/:id/edit',
+        loadComponent: () =>
+          import('./features/expenses/expense-create.component').then(
+            (m) => m.ExpenseCreateComponent
+          ),
+        data: { edit: true },
+      },
+      {
         path: 'expenses/:id',
         loadComponent: () =>
           import('./features/expenses/expense-detail.component').then(

@@ -66,13 +66,13 @@ export class AuthService {
   /** 驗證自訂登入密碼後，以內部 Firebase 密碼完成登入 */
   async login(memberId: string, loginPassword: string): Promise<string | null> {
     const base = this.members.find((m) => m.id === memberId);
-    if (!base) return '找不到成員';
+    if (!base) return '找不到此成員';
 
     const valid = await this.profiles.verifyLoginPassword(
       memberId,
       loginPassword
     );
-    if (!valid) return '登入密碼不對';
+    if (!valid) return '登入密碼不正確，請重新輸入';
 
     try {
       await this.profiles.ensureProfileExists(memberId);
@@ -93,7 +93,7 @@ export class AuthService {
       }
       return null;
     } catch {
-      return 'Firebase 登入失敗，請確認 Auth 已建立帳號且密碼為 123456';
+      return '登入失敗，請確認帳號已建立且設定正確';
     }
   }
 

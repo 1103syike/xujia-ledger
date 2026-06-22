@@ -6,7 +6,8 @@ service cloud.firestore {
     }
 
     function userMemberId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.memberId;
+      let userRef = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userRef) ? get(userRef).data.memberId : null;
     }
 
     function isMember() {
