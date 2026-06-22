@@ -1,5 +1,16 @@
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { BehaviorSubject } from 'rxjs';
+import { firestoreDb } from '../firebase';
 import {
   AuditLog,
   CreateExpenseInput,
@@ -13,22 +24,29 @@ import {
 } from '../utils/split-calculator';
 import { AuthService } from './auth.service';
 
-const STORAGE_EXPENSES = 'xujia-expenses';
-const STORAGE_AUDIT = 'xujia-audit';
-
 @Injectable({ providedIn: 'root' })
-export class ExpenseService {
-  private readonly expensesSubject = new BehaviorSubject<Expense[]>(
-    this.loadExpenses()
-  );
-  private readonly auditSubject = new BehaviorSubject<AuditLog[]>(
-    this.loadAudit()
-  );
+export class ExpenseService implements OnDestroy {
+  private readonly expensesSubject = new BehaviorSubject<Expense[]>([]);
+  private readonly auditSubject = new BehaviorSubject<AuditLog[]>([]);
+  private unsubscribers: Array<() => void> = [];
 
   readonly expenses$ = this.expensesSubject.asObservable();
   readonly auditLogs$ = this.auditSubject.asObservable();
 
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService) {
+    this.auth.currentMember$.subscribe((member) => {
+      this.detachListeners();
+      if (member) this.attachListeners();
+      else {
+        this.expensesSubject.next([]);
+        this.auditSubject.next([]);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.detachListeners();
+  }
 
   get expenses(): Expense[] {
     return this.expensesSubject.value;
@@ -42,15 +60,15 @@ export class ExpenseService {
     return this.expenses.find((e) => e.id === id);
   }
 
-  createExpense(input: CreateExpenseInput): string | null {
+  async createExpense(input: CreateExpenseInput): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
-    const error = validateCreateInput(input, this.auth.members);
+    const error = validateCreateInput(input, this.auth.getAllMembers());
     if (error) return error;
 
     const seed = crypto.randomUUID?.() ?? `${Date.now()}`;
-    const preview = buildSplitPreview({ ...input, remainderSeed: seed }, this.auth.members);
+    const preview = buildSplitPreview({ ...input, remainderSeed: seed }, this.auth.getAllMembers());
     const splits = previewToSplits(preview, input.splitNotes);
     const now = new Date().toISOString();
 
@@ -62,7 +80,7 @@ export class ExpenseService {
       participantScope: input.participantScope,
       participantIds:
         input.participantScope === 'all'
-          ? this.auth.members.map((m) => m.id)
+          ? this.auth.getAllMembers().map((m) => m.id)
           : [...input.participantIds],
       splitMode: input.splitMode,
       note: input.note?.trim() || null,
@@ -75,44 +93,46 @@ export class ExpenseService {
       splits,
     };
 
-    this.persistExpenses([expense, ...this.expenses]);
-    this.addAudit({
-      actorId: actor.id,
-      action: 'expense.created',
-      entityType: 'expense',
-      entityId: expense.id,
-      payload: { expense },
-    });
-
-    return null;
+    try {
+      await setDoc(doc(firestoreDb, 'expenses', expense.id), expense);
+      await this.addAudit({
+        actorId: actor.id,
+        action: 'expense.created',
+        entityType: 'expense',
+        entityId: expense.id,
+        payload: { title: expense.title },
+      });
+      return null;
+    } catch {
+      return '建立失敗，請確認 Firestore 權限';
+    }
   }
 
-  cancelExpense(expenseId: string): string | null {
+  async cancelExpense(expenseId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
-    const expenses = this.expenses.map((e) => {
-      if (e.id !== expenseId) return e;
-      return {
-        ...e,
-        status: 'cancelled' as const,
+    if (!this.expenses.find((e) => e.id === expenseId)) return '找不到帳款';
+
+    try {
+      await updateDoc(doc(firestoreDb, 'expenses', expenseId), {
+        status: 'cancelled',
         updatedAt: new Date().toISOString(),
-      };
-    });
-
-    this.persistExpenses(expenses);
-    this.addAudit({
-      actorId: actor.id,
-      action: 'expense.cancelled',
-      entityType: 'expense',
-      entityId: expenseId,
-      payload: {},
-    });
-
-    return null;
+      });
+      await this.addAudit({
+        actorId: actor.id,
+        action: 'expense.cancelled',
+        entityType: 'expense',
+        entityId: expenseId,
+        payload: {},
+      });
+      return null;
+    } catch {
+      return '取消失敗';
+    }
   }
 
-  markPaid(expenseId: string): string | null {
+  async markPaid(expenseId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
@@ -122,13 +142,14 @@ export class ExpenseService {
     const split = expense.splits.find((s) => s.memberId === actor.id);
     if (!split) return '你不在分攤名單中';
     if (actor.id === expense.payerId) return '代墊者不需標記繳款';
+    if (split.amount <= 0) return '此筆不需付款';
     if (split.paymentStatus === 'confirmed') return '已結清';
     if (split.paymentStatus === 'marked') return '已標記';
 
     return this.applySplitUpdate(expenseId, actor.id, 'marked', 'payment.marked');
   }
 
-  confirmPayment(expenseId: string, debtorId: string): string | null {
+  async confirmPayment(expenseId: string, debtorId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
@@ -143,7 +164,7 @@ export class ExpenseService {
     return this.applySplitUpdate(expenseId, debtorId, 'confirmed', 'payment.confirmed');
   }
 
-  unconfirmPayment(expenseId: string, debtorId: string): string | null {
+  async unconfirmPayment(expenseId: string, debtorId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
@@ -158,77 +179,86 @@ export class ExpenseService {
     return this.applySplitUpdate(expenseId, debtorId, 'marked', 'payment.unconfirmed');
   }
 
-  private applySplitUpdate(
+  private async applySplitUpdate(
     expenseId: string,
     targetMemberId: string,
     nextStatus: ExpenseSplit['paymentStatus'],
     action: string
-  ): string | null {
+  ): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入';
 
+    const expense = this.expenses.find((e) => e.id === expenseId);
+    if (!expense) return '找不到帳款';
+
     const now = new Date().toISOString();
-    const expenses = this.expenses.map((expense) => {
-      if (expense.id !== expenseId) return expense;
+    const splits = expense.splits.map((split) => {
+      if (split.memberId !== targetMemberId) return split;
+      return {
+        ...split,
+        paymentStatus: nextStatus,
+        markedAt: split.markedAt ?? now,
+        confirmedAt: nextStatus === 'confirmed' ? now : null,
+      };
+    });
 
-      const splits = expense.splits.map((split) => {
-        if (split.memberId !== targetMemberId) return split;
-        return {
-          ...split,
-          paymentStatus: nextStatus,
-          markedAt: split.markedAt ?? now,
-          confirmedAt: nextStatus === 'confirmed' ? now : null,
-        };
+    try {
+      await updateDoc(doc(firestoreDb, 'expenses', expenseId), {
+        splits,
+        updatedAt: now,
       });
-
-      return { ...expense, splits, updatedAt: now };
-    });
-
-    this.persistExpenses(expenses);
-    this.addAudit({
-      actorId: actor.id,
-      action,
-      entityType: 'expense',
-      entityId: expenseId,
-      payload: { debtorId: targetMemberId, nextStatus },
-    });
-
-    return null;
+      await this.addAudit({
+        actorId: actor.id,
+        action,
+        entityType: 'expense',
+        entityId: expenseId,
+        payload: { debtorId: targetMemberId, nextStatus },
+      });
+      return null;
+    } catch {
+      return '更新失敗';
+    }
   }
 
-  private addAudit(
+  private async addAudit(
     partial: Omit<AuditLog, 'id' | 'createdAt'>
-  ): void {
-    const log: AuditLog = {
+  ): Promise<void> {
+    await addDoc(collection(firestoreDb, 'auditLogs'), {
       ...partial,
-      id: crypto.randomUUID?.() ?? String(Date.now()),
       createdAt: new Date().toISOString(),
-    };
-    const logs = [log, ...this.auditLogs];
-    localStorage.setItem(STORAGE_AUDIT, JSON.stringify(logs));
-    this.auditSubject.next(logs);
+    });
   }
 
-  private persistExpenses(expenses: Expense[]): void {
-    localStorage.setItem(STORAGE_EXPENSES, JSON.stringify(expenses));
-    this.expensesSubject.next(expenses);
+  private attachListeners(): void {
+    const expensesQuery = query(
+      collection(firestoreDb, 'expenses'),
+      orderBy('createdAt', 'desc')
+    );
+    this.unsubscribers.push(
+      onSnapshot(expensesQuery, (snap) => {
+        const rows = snap.docs.map(
+          (d) => ({ id: d.id, ...d.data() }) as Expense
+        );
+        this.expensesSubject.next(rows);
+      })
+    );
+
+    const auditQuery = query(
+      collection(firestoreDb, 'auditLogs'),
+      orderBy('createdAt', 'desc')
+    );
+    this.unsubscribers.push(
+      onSnapshot(auditQuery, (snap) => {
+        const rows = snap.docs.map(
+          (d) => ({ id: d.id, ...d.data() }) as AuditLog
+        );
+        this.auditSubject.next(rows);
+      })
+    );
   }
 
-  private loadExpenses(): Expense[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_EXPENSES);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private loadAudit(): AuditLog[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_AUDIT);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+  private detachListeners(): void {
+    this.unsubscribers.forEach((unsub) => unsub());
+    this.unsubscribers = [];
   }
 }

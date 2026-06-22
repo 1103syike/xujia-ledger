@@ -5,22 +5,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function memberDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function userMemberId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.memberId;
     }
 
     function isMember() {
-      return isSignedIn() && memberDoc().data.memberId != null;
+      return isSignedIn() && userMemberId() != null;
+    }
+
+    function isSelf(memberId) {
+      return isMember() && userMemberId() == memberId;
     }
 
     match /users/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
     }
 
-    match /members/{memberId} {
-      allow read: if isMember();
+    // 登入前需讀取自訂密碼（內部私用）
+    match /memberProfiles/{memberId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSelf(memberId);
     }
 
     match /expenses/{expenseId} {
@@ -28,12 +34,6 @@ service cloud.firestore {
       allow create: if isMember();
       allow update: if isMember();
       allow delete: if false;
-
-      match /splits/{splitId} {
-        allow read: if isMember();
-        allow create: if isMember();
-        allow update: if isMember();
-      }
     }
 
     match /auditLogs/{logId} {

@@ -9,7 +9,6 @@ import {
 import { Router } from '@angular/router';
 import {
   CreateExpenseInput,
-  ParticipantScope,
   SplitMode,
 } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
@@ -20,11 +19,19 @@ import {
   validateCreateInput,
 } from '../../core/utils/split-calculator';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { MemberPickerComponent } from '../../shared/components/member-picker.component';
+import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 
 @Component({
   selector: 'app-expense-create',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MemberAvatarComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MemberAvatarComponent,
+    MemberPickerComponent,
+    SplitPieChartComponent,
+  ],
   template: `
     <h2 class="mb-4 text-lg font-bold">建立帳款</h2>
 
@@ -46,56 +53,12 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
           placeholder="0"
         />
 
-        <label class="block text-sm font-medium">代墊者</label>
-        <select
-          formControlName="payerId"
-          class="w-full rounded-2xl border border-peach/30 bg-cream px-4 py-3"
-        >
-          <option *ngFor="let m of auth.members" [value]="m.id">
-            {{ m.emoji }} {{ m.name }}
-          </option>
-        </select>
-      </div>
-
-      <div class="card space-y-3">
-        <p class="text-sm font-medium">誰要分攤？</p>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="rounded-2xl px-4 py-2 text-sm"
-            [class.bg-peach]="participantScope === 'all'"
-            [class.text-white]="participantScope === 'all'"
-            [class.bg-cream]="participantScope !== 'all'"
-            (click)="setScope('all')"
-          >
-            全部人
-          </button>
-          <button
-            type="button"
-            class="rounded-2xl px-4 py-2 text-sm"
-            [class.bg-peach]="participantScope === 'specific'"
-            [class.text-white]="participantScope === 'specific'"
-            [class.bg-cream]="participantScope !== 'specific'"
-            (click)="setScope('specific')"
-          >
-            特定人
-          </button>
-        </div>
-
-        <div *ngIf="participantScope === 'specific'" class="space-y-2">
-          <label
-            *ngFor="let m of auth.members"
-            class="flex items-center gap-3 rounded-2xl bg-cream p-3"
-          >
-            <input
-              type="checkbox"
-              [checked]="selectedIds.has(m.id)"
-              (change)="toggleMember(m.id, $any($event.target).checked)"
-            />
-            <app-member-avatar [member]="m" />
-            <span>{{ m.name }}</span>
-          </label>
-        </div>
+        <app-member-picker
+          label="代墊者"
+          [members]="auth.getAllMembers()"
+          [value]="form.value.payerId"
+          (valueChange)="setPayer($event)"
+        />
       </div>
 
       <div class="card space-y-3">
@@ -124,9 +87,11 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
         </div>
 
         <div *ngIf="splitMode === 'itemized'" class="space-y-3">
+          <p class="text-xs text-ink/50">五人全列出，不用付請填 0</p>
           <div
-            *ngFor="let m of activeMembers"
+            *ngFor="let m of auth.getAllMembers()"
             class="rounded-2xl bg-cream p-3"
+            [class.opacity-60]="isZeroAmount(m.id)"
           >
             <div class="flex items-center gap-2">
               <app-member-avatar [member]="m" />
@@ -135,14 +100,14 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
                 type="number"
                 inputmode="numeric"
                 class="w-24 rounded-xl border border-peach/30 px-2 py-1 text-right"
-                [value]="manualAmounts[m.id] ?? ''"
+                [value]="amountDisplay(m.id)"
                 (input)="setManualAmount(m.id, $any($event.target).value)"
                 placeholder="0"
               />
             </div>
             <input
               class="mt-2 w-full rounded-xl border border-peach/20 bg-white px-3 py-2 text-sm"
-              [value]="splitNotes[m.id] ?? ''"
+              [value]="noteDisplay(m.id)"
               (input)="setSplitNote(m.id, $any($event.target).value)"
               placeholder="小備注（選填）"
             />
@@ -163,20 +128,29 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
       </div>
 
       <div *ngIf="preview" class="card">
-        <p class="mb-2 text-sm font-medium">預覽分攤</p>
+        <p class="mb-2 text-sm font-medium">分攤比例</p>
+        <app-split-pie-chart
+          [slices]="previewSlices"
+          [totalAmount]="form.value.totalAmount"
+        />
+
+        <p class="mb-2 mt-4 text-sm font-medium">預覽明細</p>
         <div
           *ngFor="let line of preview.lines"
           class="flex items-center justify-between py-1 text-sm"
         >
           <span>{{ auth.getMember(line.memberId)?.name }}</span>
-          <span>
-            NT$ {{ line.amount }}
-            <span
-              *ngIf="line.isRemainderBearer"
-              class="chip ml-1 bg-coral/20 text-xs text-coral"
-            >
-              零頭 +{{ line.remainderAmount }}
-            </span>
+          <span [class.opacity-60]="line.amount === 0">
+            <ng-container *ngIf="line.amount === 0; else amountLine">不用付</ng-container>
+            <ng-template #amountLine>
+              NT$ {{ line.amount }}
+              <span
+                *ngIf="line.isRemainderBearer"
+                class="chip ml-1 bg-coral/20 text-xs text-coral"
+              >
+                零頭 +{{ line.remainderAmount }}
+              </span>
+            </ng-template>
           </span>
         </div>
         <p class="mt-2 border-t border-peach/20 pt-2 text-sm">
@@ -193,14 +167,13 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
 })
 export class ExpenseCreateComponent implements OnInit {
   form: FormGroup;
-  participantScope: ParticipantScope = 'all';
   splitMode: SplitMode = 'equal';
-  selectedIds = new Set<string>();
   manualAmounts: Record<string, number> = {};
   splitNotes: Record<string, string> = {};
   preview: SplitPreview | null = null;
   error = '';
   remainderSeed = '';
+  private itemizedCustomized = false;
 
   constructor(
     public auth: AuthService,
@@ -211,34 +184,34 @@ export class ExpenseCreateComponent implements OnInit {
     this.form = this.fb.group({
       title: ['', Validators.required],
       totalAmount: [null, [Validators.required, Validators.min(1)]],
-      payerId: [auth.members[0]?.id ?? ''],
+      payerId: [auth.getAllMembers()[0]?.id ?? ''],
       note: [''],
     });
     this.remainderSeed = crypto.randomUUID?.() ?? String(Date.now());
   }
 
+  get previewSlices() {
+    return (
+      this.preview?.lines.map((line) => ({
+        memberId: line.memberId,
+        amount: line.amount,
+      })) ?? []
+    );
+  }
+
   ngOnInit(): void {
-    this.auth.members.forEach((m) => this.selectedIds.add(m.id));
-    this.form.valueChanges.subscribe(() => this.refreshPreview());
+    this.form.valueChanges.subscribe(() => {
+      if (this.splitMode === 'itemized' && !this.itemizedCustomized) {
+        this.applyEqualItemizedDefaults();
+      }
+      this.refreshPreview();
+    });
     this.refreshPreview();
   }
 
-  get activeMembers() {
-    return this.participantScope === 'all'
-      ? this.auth.members
-      : this.auth.members.filter((m) => this.selectedIds.has(m.id));
-  }
-
-  setScope(scope: ParticipantScope): void {
-    this.participantScope = scope;
-    if (scope === 'all') {
-      this.auth.members.forEach((m) => this.selectedIds.add(m.id));
-    } else {
-      const payerId = this.form.value.payerId;
-      this.selectedIds.clear();
-      this.auth.members.forEach((m) => this.selectedIds.add(m.id));
-      if (payerId) this.selectedIds.add(payerId);
-    }
+  setPayer(id: string): void {
+    this.form.patchValue({ payerId: id });
+    this.syncItemizedDefaults();
     this.refreshPreview();
   }
 
@@ -246,22 +219,22 @@ export class ExpenseCreateComponent implements OnInit {
     this.splitMode = mode;
     if (mode === 'equal') {
       this.splitNotes = {};
+      this.manualAmounts = {};
+      this.itemizedCustomized = false;
+    } else {
+      this.itemizedCustomized = false;
+      this.applyEqualItemizedDefaults();
     }
     this.refreshPreview();
   }
 
-  toggleMember(id: string, checked: boolean): void {
-    if (checked) this.selectedIds.add(id);
-    else this.selectedIds.delete(id);
-    this.refreshPreview();
-  }
-
   setManualAmount(id: string, value: string): void {
+    this.itemizedCustomized = true;
     const n = Number(value);
     if (value === '' || Number.isNaN(n)) {
       delete this.manualAmounts[id];
     } else {
-      this.manualAmounts[id] = n;
+      this.manualAmounts[id] = Math.max(0, n);
     }
     this.refreshPreview();
   }
@@ -271,26 +244,65 @@ export class ExpenseCreateComponent implements OnInit {
     else delete this.splitNotes[id];
   }
 
+  amountDisplay(id: string): string {
+    return id in this.manualAmounts ? String(this.manualAmounts[id]) : '';
+  }
+
+  noteDisplay(id: string): string {
+    return this.splitNotes[id] ?? '';
+  }
+
+  isZeroAmount(id: string): boolean {
+    return id in this.manualAmounts && this.manualAmounts[id] === 0;
+  }
+
   refreshPreview(): void {
     const input = this.buildInput();
     if (!input.totalAmount || input.totalAmount <= 0) {
       this.preview = null;
       return;
     }
-    this.preview = buildSplitPreview(input, this.auth.members);
+    this.preview = buildSplitPreview(input, this.auth.getAllMembers());
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
     const input = this.buildInput();
-    this.error = validateCreateInput(input, this.auth.members) ?? '';
+    this.error = validateCreateInput(input, this.auth.getAllMembers()) ?? '';
     if (this.error) return;
 
-    const err = this.expenses.createExpense(input);
+    const err = await this.expenses.createExpense(input);
     if (err) {
       this.error = err;
       return;
     }
     this.router.navigateByUrl('/expenses');
+  }
+
+  private syncItemizedDefaults(): void {
+    if (this.splitMode === 'itemized' && !this.itemizedCustomized) {
+      this.applyEqualItemizedDefaults();
+    }
+  }
+
+  /** 細分模式預設帶入平分金額（含零頭規則） */
+  private applyEqualItemizedDefaults(): void {
+    const total = Number(this.form.value.totalAmount) || 0;
+    if (total <= 0) {
+      this.manualAmounts = {};
+      return;
+    }
+
+    const input = this.buildInput();
+    const preview = buildSplitPreview(
+      { ...input, splitMode: 'equal' },
+      this.auth.getAllMembers()
+    );
+
+    const amounts: Record<string, number> = {};
+    for (const line of preview.lines) {
+      amounts[line.memberId] = line.amount;
+    }
+    this.manualAmounts = amounts;
   }
 
   private buildInput(): CreateExpenseInput {
@@ -299,8 +311,8 @@ export class ExpenseCreateComponent implements OnInit {
       title: v.title ?? '',
       totalAmount: Number(v.totalAmount) || 0,
       payerId: v.payerId,
-      participantScope: this.participantScope,
-      participantIds: [...this.selectedIds],
+      participantScope: 'all',
+      participantIds: this.auth.members.map((m) => m.id),
       splitMode: this.splitMode,
       note: v.note || null,
       manualAmounts: { ...this.manualAmounts },

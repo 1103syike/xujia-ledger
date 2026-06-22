@@ -4,12 +4,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        cream: '#FFF8F0',
-        peach: '#FFB5A7',
-        mint: '#B8E8D1',
-        lavender: '#D4C1EC',
-        coral: '#FF8FAB',
-        ink: '#3D3D3D',
+        cream: 'var(--theme-cream)',
+        peach: 'var(--theme-peach)',
+        mint: 'var(--theme-mint)',
+        lavender: 'var(--theme-lavender)',
+        coral: 'var(--theme-coral)',
+        ink: 'var(--theme-ink)',
       },
       fontFamily: {
         sans: ['"Noto Sans TC"', 'system-ui', 'sans-serif'],

@@ -3,11 +3,23 @@ export type SplitMode = 'equal' | 'itemized';
 export type ExpenseStatus = 'open' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'marked' | 'confirmed';
 
+export type { DisplayMember, MemberProfile, ThemeColors, ThemePreset, ThemePresetId } from './member-profile';
+export {
+  DEFAULT_THEME,
+  DEFAULT_THEME_PRESET_ID,
+  displayNameOf,
+  FIREBASE_INTERNAL_PASSWORD,
+  getThemePreset,
+  resolveThemeColors,
+  THEME_PRESETS,
+} from './member-profile';
+
 export interface Member {
   id: string;
   name: string;
   emoji: string;
   color: string;
+  loginEmail: string;
 }
 
 export interface ExpenseSplit {
@@ -69,9 +81,9 @@ export interface CreateExpenseInput {
 }
 
 export const DEFAULT_MEMBERS: Member[] = [
-  { id: 'm1', name: '成員一', emoji: '🌸', color: '#FFB5A7' },
-  { id: 'm2', name: '成員二', emoji: '🌿', color: '#B8E8D1' },
-  { id: 'm3', name: '成員三', emoji: '💜', color: '#D4C1EC' },
-  { id: 'm4', name: '成員四', emoji: '⭐', color: '#FFD6A5' },
-  { id: 'm5', name: '成員五', emoji: '🫧', color: '#A0C4FF' },
+  { id: 'm1', name: '林庭郁', emoji: '🌸', color: '#FFB5A7', loginEmail: 'm1@xujia-ledger.app' },
+  { id: 'm2', name: '鄭丞恩', emoji: '🌿', color: '#B8E8D1', loginEmail: 'm2@xujia-ledger.app' },
+  { id: 'm3', name: '林榆凱', emoji: '💜', color: '#D4C1EC', loginEmail: 'm3@xujia-ledger.app' },
+  { id: 'm4', name: '許育愷', emoji: '⭐', color: '#FFD6A5', loginEmail: 'm4@xujia-ledger.app' },
+  { id: 'm5', name: '黃品瑜', emoji: '🫧', color: '#A0C4FF', loginEmail: 'm5@xujia-ledger.app' },
 ];

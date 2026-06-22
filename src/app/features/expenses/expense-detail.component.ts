@@ -5,11 +5,12 @@ import { map, switchMap } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 
 @Component({
   selector: 'app-expense-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, MemberAvatarComponent],
+  imports: [CommonModule, RouterLink, MemberAvatarComponent, SplitPieChartComponent],
   template: `
     <ng-container *ngIf="expense$ | async as expense">
       <a routerLink="/expenses" class="mb-4 inline-block text-sm text-ink/50">
@@ -32,11 +33,20 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
         </p>
       </div>
 
+      <div class="card mb-4">
+        <p class="mb-1 font-medium">分攤比例</p>
+        <app-split-pie-chart
+          [slices]="expense.splits"
+          [totalAmount]="expense.totalAmount"
+        />
+      </div>
+
       <div class="card mb-4 space-y-3">
         <p class="font-medium">分攤明細</p>
         <div
           *ngFor="let split of expense.splits"
           class="rounded-2xl bg-cream p-3"
+          [class.opacity-60]="split.amount === 0"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -46,7 +56,8 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
               </ng-container>
             </div>
             <div class="text-right">
-              <p class="font-bold">NT$ {{ split.amount }}</p>
+              <p *ngIf="split.amount === 0" class="font-medium text-ink/40">不用付</p>
+              <p *ngIf="split.amount > 0" class="font-bold">NT$ {{ split.amount }}</p>
               <span
                 *ngIf="split.isRemainderBearer"
                 class="chip bg-coral/20 text-xs text-coral"
@@ -127,7 +138,11 @@ export class ExpenseDetailComponent {
     private router: Router
   ) {}
 
-  statusLabel(split: { memberId: string; paymentStatus: string }, payerId: string): string {
+  statusLabel(
+    split: { memberId: string; paymentStatus: string; amount: number },
+    payerId: string
+  ): string {
+    if (split.amount === 0) return '— 不用付';
     if (split.memberId === payerId) return '代墊者';
     switch (split.paymentStatus) {
       case 'confirmed':
@@ -146,10 +161,11 @@ export class ExpenseDetailComponent {
   }
 
   canMarkPaid(
-    split: { memberId: string; paymentStatus: string },
+    split: { memberId: string; paymentStatus: string; amount: number },
     expense: { payerId: string }
   ): boolean {
     return (
+      split.amount > 0 &&
       split.memberId === this.auth.currentMember?.id &&
       split.memberId !== expense.payerId &&
       split.paymentStatus === 'unpaid'
@@ -157,10 +173,11 @@ export class ExpenseDetailComponent {
   }
 
   canConfirm(
-    split: { memberId: string; paymentStatus: string },
+    split: { memberId: string; paymentStatus: string; amount: number },
     expense: { payerId: string }
   ): boolean {
     return (
+      split.amount > 0 &&
       expense.payerId === this.auth.currentMember?.id &&
       split.memberId !== expense.payerId &&
       split.paymentStatus === 'marked'
@@ -168,31 +185,32 @@ export class ExpenseDetailComponent {
   }
 
   canUnconfirm(
-    split: { memberId: string; paymentStatus: string },
+    split: { memberId: string; paymentStatus: string; amount: number },
     expense: { payerId: string }
   ): boolean {
     return (
+      split.amount > 0 &&
       expense.payerId === this.auth.currentMember?.id &&
       split.memberId !== expense.payerId &&
       split.paymentStatus === 'confirmed'
     );
   }
 
-  markPaid(id: string): void {
-    this.message = this.expenses.markPaid(id) ?? '已標記';
+  async markPaid(id: string): Promise<void> {
+    this.message = (await this.expenses.markPaid(id)) ?? '已標記';
   }
 
-  confirm(expenseId: string, debtorId: string): void {
-    this.message = this.expenses.confirmPayment(expenseId, debtorId) ?? '已確認';
+  async confirm(expenseId: string, debtorId: string): Promise<void> {
+    this.message = (await this.expenses.confirmPayment(expenseId, debtorId)) ?? '已確認';
   }
 
-  unconfirm(expenseId: string, debtorId: string): void {
-    this.message = this.expenses.unconfirmPayment(expenseId, debtorId) ?? '已撤銷';
+  async unconfirm(expenseId: string, debtorId: string): Promise<void> {
+    this.message = (await this.expenses.unconfirmPayment(expenseId, debtorId)) ?? '已撤銷';
   }
 
-  cancel(id: string): void {
+  async cancel(id: string): Promise<void> {
     if (!confirm('確定移除此帳款？')) return;
-    this.expenses.cancelExpense(id);
+    await this.expenses.cancelExpense(id);
     this.router.navigateByUrl('/expenses');
   }
 }

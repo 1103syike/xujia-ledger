@@ -70,7 +70,7 @@ export class PendingComponent {
     private expenses: ExpenseService
   ) {}
 
-  confirm(expenseId: string, debtorId: string): void {
-    this.expenses.confirmPayment(expenseId, debtorId);
+  async confirm(expenseId: string, debtorId: string): Promise<void> {
+    await this.expenses.confirmPayment(expenseId, debtorId);
   }
 }

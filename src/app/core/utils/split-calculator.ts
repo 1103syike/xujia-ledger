@@ -183,8 +183,15 @@ export function validateCreateInput(
   }
 
   if (input.splitMode === 'itemized') {
+    const amounts = input.manualAmounts ?? {};
+    if (Object.values(amounts).some((a) => a < 0)) {
+      return '金額不可為負數';
+    }
     if (preview.total !== input.totalAmount) {
       return `細分加總 ${preview.total} 需等於總額 ${input.totalAmount}`;
+    }
+    if (!preview.lines.some((line) => line.amount > 0)) {
+      return '至少一人需有分攤金額';
     }
   }
 

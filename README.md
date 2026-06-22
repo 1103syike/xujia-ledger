@@ -4,53 +4,64 @@
 
 | | |
 |---|---|
+| **線上** | [xujia-ledger.vercel.app](https://xujia-ledger.vercel.app/) |
 | **GitHub** | [github.com/1103syike/xujia-ledger](https://github.com/1103syike/xujia-ledger) |
-| **技術** | Angular 16 · Firestore · Vercel |
-| **平台** | 手機優先 PWA（iPhone 可加主畫面） |
+| **技術** | Angular 16 · Firebase Auth · Firestore · Vercel |
 
 ## 功能
 
-- 建立帳款：全部人／特定人 × 平分／細分
-- 平分零頭：在非代墊者中隨機一人承擔（代墊福利），並標記
-- 備注：平分整筆備注；細分大備注 + 每人小備注（皆選填）
-- 繳款流程：標記已付 → 代墊者確認 → 可撤銷確認
-- 儀表板：誰欠誰最多、最近一筆開銷
-- 完整操作紀錄
+- 建立帳款：平分／細分（五人全列出，不用付填 0）
+- 平分零頭：非代墊者隨機一人承擔（代墊福利）
+- 備注：整筆 + 細分每人小備注（選填）
+- 繳款：標記已付 → 代墊者確認 → 可撤銷
+- 圓餅圖分攤比例、儀表板、操作紀錄
+- Firebase 即時同步
 
 ## 本地開發
 
 ```bash
-cd xujia-ledger
 npm install
 npm start
 ```
 
-開啟 http://localhost:4200 ，選擇成員即可使用（目前 `demoMode: true`，資料存 localStorage）。
+## Firebase 設定（必做）
 
-## Firebase 設定
+專案：`xujia-ledger`
 
-1. 建立 Firebase 專案，啟用 Firestore + Authentication
-2. 複製設定到 `src/environments/environment.prod.ts`
-3. 將 `demoMode` 改為 `false`
-4. 部署 `firestore.rules`：
+### 1. Authentication
+
+- 啟用 **Email/Password**
+- Authorized domains 加入 `xujia-ledger.vercel.app`
+- 建立 5 個用戶（密碼預設 `1234`）：
+
+| Email | 對應成員 |
+|-------|---------|
+| `m1@xujia-ledger.app` | 成員一 |
+| `m2@xujia-ledger.app` | 成員二 |
+| `m3@xujia-ledger.app` | 成員三 |
+| `m4@xujia-ledger.app` | 成員四 |
+| `m5@xujia-ledger.app` | 成員五 |
+
+### 2. Firestore
+
+- 建立資料庫（production mode）
+- 部署 Rules：
 
 ```bash
+firebase login
 firebase deploy --only firestore:rules
 ```
 
+### 3. 登入方式
+
+1. 輸入密碼（預設 `1234`）
+2. 點成員名字 → Firebase Auth 登入
+3. 首次登入會自動寫入 `users/{uid}` → `{ memberId: 'm1' }`
+
 ## Vercel 部署
 
-1. 在 [Vercel](https://vercel.com) 匯入 [GitHub repo](https://github.com/1103syike/xujia-ledger)
-2. Root Directory：`xujia-ledger`（若 repo 根目錄即專案則留空）
-3. Build Command：`npm run build`
-4. Output Directory：`dist/xujia-ledger`
-5. 已含 `vercel.json` SPA fallback
+Push 到 GitHub 後自動 build。設定已在 `environment.prod.ts` / `firebase.config.ts`。
 
 ## 自訂成員
 
-編輯 `src/app/core/models/index.ts` 的 `DEFAULT_MEMBERS`（名稱、emoji、代表色）。
-
-## 授權
-
-私人專案，五人私用。
-# xujia-ledger
+編輯 `src/app/core/models/index.ts` 的 `DEFAULT_MEMBERS`（名稱、emoji、`loginEmail`），並在 Firebase Auth 建立對應帳號。

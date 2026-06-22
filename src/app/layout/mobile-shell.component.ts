@@ -2,22 +2,41 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
+import { displayNameOf } from '../core/models';
+import { MemberAvatarComponent } from '../shared/components/member-avatar.component';
 
 @Component({
   selector: 'app-mobile-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    MemberAvatarComponent,
+  ],
   template: `
     <div class="mx-auto flex min-h-full max-w-md flex-col bg-cream pb-20">
-      <header class="sticky top-0 z-10 bg-cream/95 px-4 pb-2 pt-4 backdrop-blur">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs text-ink/60">許家帳本</p>
-            <h1 class="text-lg font-bold text-ink">
-              {{ greeting }}，{{ auth.currentMember?.name }}
-            </h1>
-          </div>
-          <span class="text-2xl">{{ auth.currentMember?.emoji }}</span>
+      <header class="sticky top-0 z-10 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+        <div class="card flex items-center gap-3 py-3">
+          <ng-container *ngIf="auth.currentMember as member">
+            <a routerLink="/settings" class="flex min-w-0 flex-1 items-center gap-3">
+              <app-member-avatar [member]="member" size="lg" />
+              <div class="min-w-0">
+                <p class="truncate text-base font-bold text-ink">
+                  {{ displayNameOf(member) }}
+                </p>
+                <p class="text-xs text-ink/45">點我進設定</p>
+              </div>
+            </a>
+            <a
+              routerLink="/settings"
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cream text-lg"
+              aria-label="設定"
+            >
+              ⚙️
+            </a>
+          </ng-container>
         </div>
       </header>
 
@@ -27,6 +46,7 @@ import { AuthService } from '../core/services/auth.service';
 
       <nav
         class="fixed bottom-0 left-0 right-0 mx-auto max-w-md border-t border-peach/20 bg-white/95 backdrop-blur"
+        style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
       >
         <div class="grid grid-cols-4 gap-1 px-2 py-2">
           <a
@@ -68,12 +88,7 @@ import { AuthService } from '../core/services/auth.service';
   `,
 })
 export class MobileShellComponent {
-  constructor(public auth: AuthService) {}
+  displayNameOf = displayNameOf;
 
-  get greeting(): string {
-    const h = new Date().getHours();
-    if (h < 12) return '早安';
-    if (h < 18) return '午安';
-    return '晚安';
-  }
+  constructor(public auth: AuthService) {}
 }
