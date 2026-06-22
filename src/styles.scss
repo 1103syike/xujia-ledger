@@ -144,7 +144,7 @@ a:focus-visible {
   }
 
   .field-group {
-    @apply flex flex-col gap-1.5;
+    @apply flex min-w-0 flex-col gap-1.5;
   }
 
   .helper-text {
@@ -341,6 +341,31 @@ a:focus-visible {
 
   .textarea {
     @apply input resize-none;
+  }
+
+  .date-field {
+    @apply relative flex w-full min-w-0 items-center gap-2 rounded-2xl bg-cream px-4 py-3;
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  }
+
+  .date-field__display {
+    @apply pointer-events-none flex-1 text-base text-ink md:text-sm;
+  }
+
+  .date-field__display--empty {
+    color: color-mix(in srgb, var(--theme-ink) 40%, transparent);
+  }
+
+  .date-field__input {
+    @apply absolute inset-0 h-full w-full cursor-pointer opacity-0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .date-field__icon {
+    @apply h-5 w-5 shrink-0;
+    color: color-mix(in srgb, var(--theme-ink) 35%, transparent);
+    pointer-events: none;
   }
 
   .mode-chip {

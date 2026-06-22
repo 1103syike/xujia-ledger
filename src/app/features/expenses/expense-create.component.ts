@@ -26,6 +26,7 @@ import {
 } from '../../core/utils/split-calculator';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { MemberPickerComponent } from '../../shared/components/member-picker.component';
+import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { todayLocalDate, formatExpenseDateLabel } from '../../core/utils/expense-date';
@@ -45,6 +46,7 @@ interface MemberDraft {
     RouterLink,
     MemberAvatarComponent,
     MemberPickerComponent,
+    DateFieldComponent,
     SplitPieChartComponent,
     ConfirmDialogComponent,
   ],
@@ -73,14 +75,7 @@ interface MemberDraft {
             />
           </div>
 
-          <div class="field-group">
-            <label class="field-label">日期</label>
-            <input
-              formControlName="date"
-              type="date"
-              class="input"
-            />
-          </div>
+          <app-date-field formControlName="date" />
 
           <app-member-picker
             label="代墊者"
