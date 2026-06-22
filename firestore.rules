@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isMember() {
+      return isSignedIn() && memberDoc().data.memberId != null;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /members/{memberId} {
+      allow read: if isMember();
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isMember();
+      allow create: if isMember();
+      allow update: if isMember();
+      allow delete: if false;
+
+      match /splits/{splitId} {
+        allow read: if isMember();
+        allow create: if isMember();
+        allow update: if isMember();
+      }
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isMember();
+      allow create: if isMember();
+      allow update, delete: if false;
+    }
+  }
+}

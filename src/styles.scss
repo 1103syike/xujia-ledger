@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+html,
+body {
+  height: 100%;
+  background: #fff8f0;
+  color: #3d3d3d;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: 'Noto Sans TC', system-ui, sans-serif;
+}
+
+input,
+textarea,
+button {
+  font-family: inherit;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl bg-white p-4 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply rounded-2xl bg-peach px-6 py-3 font-medium text-white shadow-sm transition active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply rounded-2xl bg-white px-6 py-3 font-medium text-ink shadow-sm ring-1 ring-peach/30 transition active:scale-95;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm;
+  }
+}
