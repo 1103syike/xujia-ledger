@@ -7,6 +7,7 @@ import { ExpenseService } from '../../core/services/expense.service';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { ExpenseDatePipe } from '../../shared/pipes/expense-date.pipe';
 
 @Component({
   selector: 'app-expense-detail',
@@ -17,6 +18,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
     MemberAvatarComponent,
     SplitPieChartComponent,
     ConfirmDialogComponent,
+    ExpenseDatePipe,
   ],
   template: `
     <div class="page" *ngIf="expense$ | async as expense">
@@ -27,7 +29,8 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
           <div class="min-w-0">
             <h2 class="section-title">{{ expense.title }}</h2>
             <p class="helper-text mt-1">
-              代墊 {{ auth.getMember(expense.payerId)?.name }}
+              {{ expense | expenseDate }}
+              · 代墊 {{ auth.getMember(expense.payerId)?.name }}
               · {{ expense.splitMode === 'equal' ? '平分' : '細分' }}
             </p>
           </div>

@@ -1,4 +1,5 @@
 import { AuditLog } from '../models';
+import { formatExpenseDateLabel } from './expense-date';
 
 export interface AuditDisplay {
   title: string;
@@ -19,9 +20,14 @@ export function formatAuditLog(
       const lines = [
         `${actor} 建立了帳款`,
         `項目：${p['title']}`,
+      ];
+      if (p['date']) {
+        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
+      }
+      lines.push(
         `總額 NT$ ${p['totalAmount']}`,
         `代墊者：${payer} · ${splitMode}`,
-      ];
+      );
       const splits = p['splits'] as
         | Array<{ name: string; amount: number; items?: Array<{ note: string; amount: number }> }>
         | undefined;
@@ -46,14 +52,27 @@ export function formatAuditLog(
       const lines = [
         `${actor} 編輯了帳款`,
         `項目：${p['title']}`,
+      ];
+      if (p['date']) {
+        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
+      }
+      lines.push(
         `總額 NT$ ${p['totalAmount']}`,
         `代墊者：${payer} · ${splitMode}`,
-      ];
+      );
       if (
         p['previousTitle'] &&
         p['previousTitle'] !== p['title']
       ) {
         lines.push(`原項目：${p['previousTitle']}`);
+      }
+      if (
+        p['previousDate'] &&
+        p['previousDate'] !== p['date']
+      ) {
+        lines.push(
+          `原日期：${formatExpenseDateLabel(String(p['previousDate']))}`
+        );
       }
       if (
         p['previousTotalAmount'] != null &&
@@ -82,6 +101,9 @@ export function formatAuditLog(
     case 'expense.cancelled': {
       const lines = [`${actor} 移除了帳款`];
       if (p['title']) lines.push(`項目：${p['title']}`);
+      if (p['date']) {
+        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
+      }
       if (p['totalAmount'] != null) lines.push(`原總額 NT$ ${p['totalAmount']}`);
       return { title: '移除帳款', lines };
     }

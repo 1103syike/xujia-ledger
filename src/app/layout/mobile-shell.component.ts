@@ -4,6 +4,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { displayNameOf } from '../core/models';
 import { MemberAvatarComponent } from '../shared/components/member-avatar.component';
+import { AppLogoComponent } from '../shared/components/app-logo.component';
 
 @Component({
   selector: 'app-mobile-shell',
@@ -14,6 +15,7 @@ import { MemberAvatarComponent } from '../shared/components/member-avatar.compon
     RouterLink,
     RouterLinkActive,
     MemberAvatarComponent,
+    AppLogoComponent,
   ],
   template: `
     <div class="mx-auto flex min-h-full max-w-md flex-col bg-cream pb-20">
@@ -58,8 +60,9 @@ import { MemberAvatarComponent } from '../shared/components/member-avatar.compon
                 </p>
                 <p
                   *ngIf="!headerCompact"
-                  class="mt-1 text-xs leading-none text-ink/45"
+                  class="mt-1 flex items-center gap-1.5 text-xs leading-none text-ink/45"
                 >
+                  <app-app-logo [size]="18" />
                   許家帳本
                 </p>
               </div>
@@ -91,39 +94,39 @@ import { MemberAvatarComponent } from '../shared/components/member-avatar.compon
         class="fixed bottom-0 left-0 right-0 mx-auto max-w-md border-t border-peach/20 bg-white/95 backdrop-blur"
         style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
       >
-        <div class="grid grid-cols-4 gap-1 px-2 py-2">
+        <div class="bottom-nav grid gap-1 px-2 py-2">
           <a
             routerLink="/"
-            routerLinkActive="text-coral"
+            routerLinkActive="bottom-nav__link--active"
             [routerLinkActiveOptions]="{ exact: true }"
-            class="flex flex-col items-center rounded-2xl py-2 text-xs text-ink/70"
+            class="bottom-nav__link"
           >
-            <span class="text-xl">🏠</span>
-            首頁
+            <span class="bottom-nav__icon" aria-hidden="true">🏠</span>
+            <span class="bottom-nav__label">首頁</span>
           </a>
           <a
             routerLink="/expenses"
-            routerLinkActive="text-coral"
-            class="flex flex-col items-center rounded-2xl py-2 text-xs text-ink/70"
+            routerLinkActive="bottom-nav__link--active"
+            class="bottom-nav__link"
           >
-            <span class="text-xl">📝</span>
-            帳款
+            <span class="bottom-nav__icon" aria-hidden="true">📝</span>
+            <span class="bottom-nav__label">帳款</span>
           </a>
           <a
             routerLink="/pending"
-            routerLinkActive="text-coral"
-            class="flex flex-col items-center rounded-2xl py-2 text-xs text-ink/70"
+            routerLinkActive="bottom-nav__link--active"
+            class="bottom-nav__link"
           >
-            <span class="text-xl">✨</span>
-            待確認
+            <span class="bottom-nav__icon" aria-hidden="true">✨</span>
+            <span class="bottom-nav__label">待確認</span>
           </a>
           <a
             routerLink="/audit"
-            routerLinkActive="text-coral"
-            class="flex flex-col items-center rounded-2xl py-2 text-xs text-ink/70"
+            routerLinkActive="bottom-nav__link--active"
+            class="bottom-nav__link"
           >
-            <span class="text-xl">📋</span>
-            紀錄
+            <span class="bottom-nav__icon" aria-hidden="true">📋</span>
+            <span class="bottom-nav__label">紀錄</span>
           </a>
         </div>
       </nav>

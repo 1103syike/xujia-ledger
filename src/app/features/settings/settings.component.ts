@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -41,24 +41,15 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         </div>
 
         <div>
-          <label class="field-label">表情符號</label>
-          <input
-            class="input text-2xl"
-            [(ngModel)]="emoji"
-            maxlength="4"
-            placeholder="🌸"
-          />
-        </div>
-
-        <div>
-          <label class="field-label">頭像底色</label>
+          <label class="field-label">代表色</label>
+          <p class="helper-text mb-1">用於標籤與分攤顯示，頭像為固定 Q 版造型</p>
           <input type="color" class="h-12 w-full rounded-2xl" [(ngModel)]="color" />
         </div>
       </div>
 
       <div class="card-stack">
         <p class="card-title">主題配色</p>
-        <p class="helper-text">選擇您偏好的風格，全站即時預覽</p>
+        <p class="helper-text">選擇後請按「儲存設定」才會套用至全站</p>
 
         <button
           *ngFor="let preset of themePresets"
@@ -146,7 +137,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
     </div>
   `,
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnDestroy {
   themePresets = THEME_PRESETS;
   displayNameOf = displayNameOf;
 
@@ -180,7 +171,10 @@ export class SettingsComponent {
 
   selectTheme(id: ThemePresetId): void {
     this.themePresetId = id;
-    this.themeService.applyTheme(getThemePreset(id).colors);
+  }
+
+  ngOnDestroy(): void {
+    this.themeService.applyForMember(this.auth.currentMember);
   }
 
   private loadFromCurrent(): void {
@@ -190,6 +184,7 @@ export class SettingsComponent {
     this.emoji = me.emoji;
     this.color = me.color;
     this.themePresetId = me.themePresetId;
+    this.themeService.applyForMember(me);
   }
 
   openSaveDialog(): void {
@@ -225,7 +220,6 @@ export class SettingsComponent {
 
     const patch: Record<string, unknown> = {
       nickname: this.nickname.trim(),
-      emoji: this.emoji.trim() || me.emoji,
       color: this.color,
       themePresetId: this.themePresetId,
     };

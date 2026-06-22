@@ -24,6 +24,10 @@ import {
   validateCreateInput,
 } from '../utils/split-calculator';
 import { formatFirestoreError, stripUndefined } from '../utils/firestore-data';
+import {
+  compareExpensesByDate,
+  normalizeExpense,
+} from '../utils/expense-date';
 import { AuthService } from './auth.service';
 
 function memberName(
@@ -84,6 +88,7 @@ export class ExpenseService implements OnDestroy {
     const expense: Expense = {
       id: seed,
       title: input.title.trim(),
+      date: input.date,
       totalAmount: input.totalAmount,
       billTotal: input.billTotal ?? null,
       payerId: input.payerId,
@@ -115,6 +120,7 @@ export class ExpenseService implements OnDestroy {
         entityId: expense.id,
         payload: stripUndefined({
           title: expense.title,
+          date: expense.date,
           totalAmount: expense.totalAmount,
           payerId: expense.payerId,
           payerName: memberName(this.auth, expense.payerId),
@@ -165,6 +171,7 @@ export class ExpenseService implements OnDestroy {
     const updated: Expense = {
       ...existing,
       title: input.title.trim(),
+      date: input.date,
       totalAmount: input.totalAmount,
       billTotal: input.billTotal ?? null,
       payerId: input.payerId,
@@ -186,6 +193,7 @@ export class ExpenseService implements OnDestroy {
         doc(firestoreDb, 'expenses', expenseId),
         stripUndefined({
           title: updated.title,
+          date: updated.date,
           totalAmount: updated.totalAmount,
           billTotal: updated.billTotal,
           payerId: updated.payerId,
@@ -206,12 +214,14 @@ export class ExpenseService implements OnDestroy {
         entityId: expenseId,
         payload: stripUndefined({
           title: updated.title,
+          date: updated.date,
           totalAmount: updated.totalAmount,
           payerId: updated.payerId,
           payerName: memberName(this.auth, updated.payerId),
           splitMode: updated.splitMode,
           note: updated.note,
           previousTitle: existing.title,
+          previousDate: existing.date,
           previousTotalAmount: existing.totalAmount,
           splits: updated.splits.map((s) => ({
             memberId: s.memberId,
@@ -247,6 +257,7 @@ export class ExpenseService implements OnDestroy {
         entityId: expenseId,
         payload: {
           title: expense.title,
+          date: expense.date,
           totalAmount: expense.totalAmount,
         },
       });
@@ -369,9 +380,9 @@ export class ExpenseService implements OnDestroy {
     );
     this.unsubscribers.push(
       onSnapshot(expensesQuery, (snap) => {
-        const rows = snap.docs.map(
-          (d) => ({ id: d.id, ...d.data() }) as Expense
-        );
+        const rows = snap.docs
+          .map((d) => normalizeExpense({ id: d.id, ...d.data() } as Expense))
+          .sort(compareExpensesByDate);
         this.expensesSubject.next(rows);
       })
     );

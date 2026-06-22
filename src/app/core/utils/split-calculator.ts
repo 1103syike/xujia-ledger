@@ -239,6 +239,12 @@ export function validateCreateInput(
   if (!input.title.trim()) {
     return '請填寫項目名稱';
   }
+  if (!input.date?.trim()) {
+    return '請選擇日期';
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    return '日期格式不正確';
+  }
   if (input.totalAmount <= 0) {
     return '總金額必須大於 0';
   }

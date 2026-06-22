@@ -4,11 +4,12 @@ import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { formatAuditLog } from '../../core/utils/audit-formatter';
+import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 
 @Component({
   selector: 'app-audit',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, KaomojiDecoComponent],
   template: `
     <div class="page">
       <div class="page-title-bar">
@@ -16,7 +17,7 @@ import { formatAuditLog } from '../../core/utils/audit-formatter';
       </div>
 
       <div *ngIf="(logs$ | async)?.length === 0" class="empty-state">
-        <p class="empty-state__icon">📋</p>
+        <app-kaomoji-deco mood="audit" seed="audit-empty" />
         <p class="empty-state__text">尚無操作紀錄</p>
       </div>
 
@@ -43,7 +44,7 @@ import { formatAuditLog } from '../../core/utils/audit-formatter';
 export class AuditComponent {
   logs$ = this.expenses.auditLogs$.pipe(
     map((logs) =>
-      logs.slice(0, 50).map((log) => ({
+      logs.map((log) => ({
         log,
         display: formatAuditLog(log, (id) => this.auth.getMember(id)?.name),
       }))
@@ -51,7 +52,7 @@ export class AuditComponent {
   );
 
   constructor(
-    public auth: AuthService,
+    private auth: AuthService,
     private expenses: ExpenseService
   ) {}
 }

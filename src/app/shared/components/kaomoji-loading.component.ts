@@ -1,14 +1,6 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
-const FACES = [
-  '(｡･ω･｡)ﾉ',
-  '(๑•̀ㅂ•́)و✧',
-  '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧',
-  '(⌐■_■)',
-  '(づ｡◕‿‿◕｡)づ',
-  '٩(ˊᗜˋ*)و',
-];
+import { pickKaomoji } from '../../core/utils/kaomoji-pools';
 
 @Component({
   selector: 'app-kaomoji-loading',
@@ -20,7 +12,7 @@ const FACES = [
       role="status"
       aria-live="polite"
     >
-      <p class="section-title mb-4 min-h-[2rem] text-center">{{ face }}</p>
+      <p class="kaomoji-deco mb-4 min-h-[2rem] text-center">{{ face }}</p>
       <div class="h-2.5 w-56 overflow-hidden rounded-full bg-peach/20">
         <div class="loading-bar h-full rounded-full"></div>
       </div>
@@ -31,14 +23,14 @@ const FACES = [
 export class KaomojiLoadingComponent implements OnInit, OnDestroy {
   @Input() message = '載入中，請稍候';
 
-  face = FACES[0];
+  face = pickKaomoji('login', 'loading', 0);
   private timer?: ReturnType<typeof setInterval>;
+  private tick = 0;
 
   ngOnInit(): void {
-    let i = 0;
     this.timer = setInterval(() => {
-      i = (i + 1) % FACES.length;
-      this.face = FACES[i];
+      this.tick++;
+      this.face = pickKaomoji('login', 'loading', this.tick);
     }, 480);
   }
 

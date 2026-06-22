@@ -19,11 +19,19 @@ import {
   totalDebtRanking,
 } from '../../core/utils/dashboard-insights';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { ExpenseDatePipe } from '../../shared/pipes/expense-date.pipe';
+import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, MemberAvatarComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MemberAvatarComponent,
+    ExpenseDatePipe,
+    KaomojiDecoComponent,
+  ],
   template: `
     <div class="page" *ngIf="vm$ | async as vm">
       <div class="page-title-bar">
@@ -36,10 +44,9 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
         class="card block bg-lavender/30"
       >
         <p class="card-title">您有 {{ vm.pendingCount }} 筆款項待確認</p>
-        <p class="helper-text mt-1">點選查看詳情</p>
+        <p class="helper-text mt-1">點選查看詳情 (・∀・)ノ</p>
       </a>
 
-      <!-- 許家財務趣味快照 -->
       <section class="card bg-peach/10" *ngIf="vm.debtRanking.length > 0">
         <div class="flex items-start justify-between gap-2">
           <div>
@@ -49,11 +56,12 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
           <button
             type="button"
             class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95"
-            (click)="refreshAllQuotes()"
+            (click)="refreshRankQuotes()"
           >
             🔄 換文案
           </button>
         </div>
+
         <div class="stack-sm mt-3">
           <div
             *ngFor="let entry of vm.debtRanking.slice(0, 3); let i = index"
@@ -87,7 +95,7 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
           <button
             type="button"
             class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95"
-            (click)="refreshAllQuotes()"
+            (click)="refreshDebtorCardQuotes()"
           >
             🔄 換文案
           </button>
@@ -138,12 +146,12 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
         class="card text-center"
         *ngIf="vm.debtRanking.length === 0 && vm.balances.length === 0"
       >
-        <p class="empty-state__icon">✨</p>
+        <app-kaomoji-deco mood="celebrate" [salt]="clearSalt" seed="clear" />
         <p class="empty-state__text">{{ clearQuipLine(vm.memberId) }}</p>
         <button
           type="button"
           class="caption-text mt-2 rounded-full bg-cream px-3 py-1 active:scale-95"
-          (click)="refreshAllQuotes()"
+          (click)="refreshClearQuote()"
         >
           🔄 換一句
         </button>
@@ -154,7 +162,7 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
           <h2 class="section-title">待結清款項</h2>
         </div>
         <div *ngIf="vm.balances.length === 0" class="empty-state">
-          <p class="empty-state__icon">🎉</p>
+          <app-kaomoji-deco mood="celebrate" seed="balances" />
           <p class="empty-state__text">目前已無待結清款項</p>
         </div>
         <div *ngIf="vm.balances.length > 0" class="stack-sm">
@@ -195,7 +203,8 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
             <div class="min-w-0">
               <p class="item-title">{{ expense.title }}</p>
               <p class="helper-text mt-1">
-                代墊：{{ auth.getMember(expense.payerId)?.name }}
+                {{ expense | expenseDate }}
+                · 代墊：{{ auth.getMember(expense.payerId)?.name }}
               </p>
             </div>
             <p class="amount-lg shrink-0">NT$ {{ expense.totalAmount }}</p>
@@ -206,16 +215,21 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
           <div class="mt-3 flex flex-wrap gap-2">
             <span
               *ngFor="let split of expense.splits"
-              class="chip"
+              class="chip inline-flex items-center gap-1.5"
               [style.background-color]="(auth.getMember(split.memberId)?.color || '#ccc') + '44'"
             >
-              {{ auth.getMember(split.memberId)?.emoji }} NT$ {{ split.amount }}
+              <app-member-avatar
+                *ngIf="auth.getMember(split.memberId) as splitMember"
+                [member]="splitMember"
+                size="xs"
+              />
+              NT$ {{ split.amount }}
             </span>
           </div>
         </a>
 
         <div *ngIf="!vm.latest" class="empty-state">
-          <p class="empty-state__icon">🌱</p>
+          <app-kaomoji-deco mood="expense" seed="latest" />
           <p class="empty-state__text">尚無帳款紀錄，歡迎建立第一筆</p>
           <a routerLink="/expenses/new" class="btn-primary mt-4 inline-block">
             建立帳款
@@ -229,7 +243,9 @@ export class DashboardComponent {
   rankTitle = rankTitle;
   quoteCounts = quoteCounts();
   copiedId: string | null = null;
-  quoteSalt = 0;
+  rankSalt = 0;
+  debtorCardSalt = 0;
+  clearSalt = 0;
   debtorSalts: Record<string, number> = {};
 
   vm$ = combineLatest([
@@ -260,8 +276,16 @@ export class DashboardComponent {
     return ['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`;
   }
 
-  refreshAllQuotes(): void {
-    this.quoteSalt++;
+  refreshRankQuotes(): void {
+    this.rankSalt++;
+  }
+
+  refreshDebtorCardQuotes(): void {
+    this.debtorCardSalt++;
+  }
+
+  refreshClearQuote(): void {
+    this.clearSalt++;
   }
 
   refreshDebtorQuote(debtorId: string): void {
@@ -272,22 +296,22 @@ export class DashboardComponent {
   }
 
   rankQuipLine(memberId: string, index: number): string {
-    return rankQuip(memberId, index, this.quoteSalt);
+    return rankQuip(memberId, index, this.rankSalt);
   }
 
   debtorQuipLine(debtorId: string, creditorId: string): string {
-    return debtorCardQuip(debtorId, creditorId, this.quoteSalt);
+    return debtorCardQuip(debtorId, creditorId, this.debtorCardSalt);
   }
 
   clearQuipLine(memberId: string): string {
     if (!memberId) return '全家清清白白的，今天可以加雞腿。';
-    return allClearQuip(memberId, this.quoteSalt);
+    return allClearQuip(memberId, this.clearSalt);
   }
 
   roastPreview(debtorId: string, amount: number): string {
     const creditorId = this.auth.currentMember?.id ?? '';
     const name = this.auth.getMember(debtorId)?.name ?? '你';
-    const salt = this.quoteSalt + (this.debtorSalts[debtorId] ?? 0);
+    const salt = this.debtorSalts[debtorId] ?? 0;
     return buildRoastMessage(name, amount, debtorId, creditorId, salt);
   }
 

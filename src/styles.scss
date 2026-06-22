@@ -207,6 +207,67 @@ a:focus-visible {
     @apply text-2xl leading-none;
   }
 
+  .deco-illustration {
+    @apply mx-auto block select-none object-contain;
+    pointer-events: none;
+  }
+
+  .deco-illustration--logo {
+    @apply h-20 w-20;
+  }
+
+  .logo-mark {
+    @apply mx-auto inline-flex rounded-3xl bg-white p-4 shadow-sm;
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 25%, transparent);
+  }
+
+  .app-logo {
+    @apply block shrink-0;
+  }
+
+  .deco-illustration--group {
+    @apply w-full max-w-xs;
+  }
+
+  .deco-illustration--empty {
+    @apply h-36 w-36;
+  }
+
+  .deco-illustration--celebrate {
+    @apply h-32 w-32;
+  }
+
+  .deco-illustration--stickers {
+    @apply w-full max-w-[14rem] opacity-80;
+  }
+
+  .deco-banner {
+    @apply overflow-hidden rounded-3xl bg-white/60 px-3 py-4 text-center shadow-sm;
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 20%, transparent);
+  }
+
+  .deco-banner--subtle {
+    @apply bg-transparent px-0 py-2 shadow-none;
+    border: none;
+  }
+
+  .login-deco-layer {
+    @apply pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pb-6 opacity-40;
+  }
+
+  .kaomoji-deco {
+    @apply font-mono text-2xl leading-none;
+    color: color-mix(in srgb, var(--theme-ink) 72%, transparent);
+  }
+
+  .kaomoji-deco--sm {
+    @apply text-xl;
+  }
+
+  .member-chibi-head {
+    @apply block shrink-0;
+  }
+
   .empty-state__text {
     @apply mt-2 text-sm;
     color: color-mix(in srgb, var(--theme-ink) 50%, transparent);
@@ -275,6 +336,28 @@ a:focus-visible {
 
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs;
+  }
+
+  .bottom-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .bottom-nav__link {
+    @apply flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-2xl py-2 no-underline transition active:scale-[0.98];
+    color: color-mix(in srgb, var(--theme-ink) 70%, transparent);
+  }
+
+  .bottom-nav__link--active {
+    color: var(--theme-coral);
+  }
+
+  .bottom-nav__icon {
+    @apply grid h-8 w-8 shrink-0 place-items-center overflow-hidden text-[22px] leading-none;
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  }
+
+  .bottom-nav__label {
+    @apply block w-full text-center text-xs leading-tight;
   }
 
   .sheet-panel {

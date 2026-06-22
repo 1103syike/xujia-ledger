@@ -6,25 +6,50 @@ import { AuthService } from '../../core/services/auth.service';
 import { DisplayMember, displayNameOf } from '../../core/models';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { KaomojiLoadingComponent } from '../../shared/components/kaomoji-loading.component';
+import { DecoIllustrationComponent } from '../../shared/components/deco-illustration.component';
+import { AppLogoComponent } from '../../shared/components/app-logo.component';
+import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, MemberAvatarComponent, KaomojiLoadingComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MemberAvatarComponent,
+    KaomojiLoadingComponent,
+    DecoIllustrationComponent,
+    AppLogoComponent,
+    KaomojiDecoComponent,
+  ],
   template: `
     <app-kaomoji-loading *ngIf="loading" message="登入中，請稍候" />
 
-    <div class="flex min-h-screen flex-col items-center justify-center bg-cream px-6 py-10">
-      <div class="mb-8 text-center">
-        <p class="text-4xl leading-none">🧾</p>
-        <h1 class="page-title mt-3 text-2xl">許家帳本</h1>
+    <div class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-cream px-6 py-10">
+      <div class="relative z-10 mb-6 text-center">
+        <div class="logo-mark">
+          <app-app-logo [size]="80" label="許家帳本" />
+        </div>
+        <h1 class="page-title mt-4 text-2xl">許家帳本</h1>
         <p class="helper-text mt-2">
           {{ selectedMember ? '請輸入登入密碼' : '請選擇您的帳號' }}
         </p>
+        <app-kaomoji-deco
+          *ngIf="!selectedMember"
+          class="mt-2 block"
+          mood="login"
+          seed="login-title"
+          [salt]="loginKaomojiSalt"
+          size="sm"
+        />
       </div>
 
       <ng-container *ngIf="!selectedMember; else passwordStep">
-        <div class="grid w-full max-w-sm grid-cols-2 gap-3">
+        <div class="deco-banner deco-banner--subtle relative z-10 mb-4 w-full max-w-sm">
+          <app-deco-illustration kind="group" alt="許家五人" />
+        </div>
+
+        <div class="relative z-10 grid w-full max-w-sm grid-cols-2 gap-3">
           <button
             *ngFor="let member of members; let last = last"
             type="button"
@@ -40,7 +65,7 @@ import { KaomojiLoadingComponent } from '../../shared/components/kaomoji-loading
       </ng-container>
 
       <ng-template #passwordStep>
-        <div class="card-stack w-full max-w-sm">
+        <div class="card-stack relative z-10 w-full max-w-sm">
           <div class="flex items-center gap-3 inset-panel">
             <app-member-avatar [member]="selectedMember!" size="lg" />
             <div class="min-w-0 flex-1">
@@ -90,6 +115,7 @@ export class LoginComponent implements OnInit {
   password = '';
   error = '';
   loading = false;
+  loginKaomojiSalt = 0;
   displayNameOf = displayNameOf;
 
   constructor(
@@ -111,6 +137,7 @@ export class LoginComponent implements OnInit {
     this.selectedMember = null;
     this.password = '';
     this.error = '';
+    this.loginKaomojiSalt++;
   }
 
   async login(): Promise<void> {

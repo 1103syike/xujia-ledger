@@ -28,6 +28,7 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
 import { MemberPickerComponent } from '../../shared/components/member-picker.component';
 import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { todayLocalDate, formatExpenseDateLabel } from '../../core/utils/expense-date';
 
 interface MemberDraft {
   note: string;
@@ -69,6 +70,15 @@ interface MemberDraft {
               formControlName="title"
               class="input"
               placeholder="請輸入項目名稱，例：飲料、晚餐"
+            />
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">日期</label>
+            <input
+              formControlName="date"
+              type="date"
+              class="input"
             />
           </div>
 
@@ -122,7 +132,7 @@ interface MemberDraft {
               <button
                 *ngFor="let m of members"
                 type="button"
-                class="chip transition"
+                class="chip inline-flex items-center gap-1.5 transition"
                 [ngClass]="
                   isSkipped(m.id)
                     ? 'bg-lavender text-ink line-through opacity-70'
@@ -130,7 +140,7 @@ interface MemberDraft {
                 "
                 (click)="toggleSkip(m.id)"
               >
-                <span>{{ m.emoji }}</span>
+                <app-member-avatar [member]="m" size="xs" />
                 <span>{{ m.name }}</span>
               </button>
             </div>
@@ -347,6 +357,7 @@ export class ExpenseCreateComponent implements OnInit, OnDestroy {
   ) {
     this.form = this.fb.group({
       title: ['', Validators.required],
+      date: [todayLocalDate(), Validators.required],
       totalAmount: [null, [Validators.min(1)]],
       billTotal: [null, [Validators.min(1)]],
       payerId: [this.members[0]?.id ?? auth.getAllMembers()[0]?.id ?? ''],
@@ -494,7 +505,8 @@ export class ExpenseCreateComponent implements OnInit, OnDestroy {
     if (this.error) return;
 
     const title = (this.form.value.title ?? '').trim();
-    this.submitDialogDetail = `${title} · NT$ ${this.effectiveTotal}`;
+    const date = this.form.value.date ?? '';
+    this.submitDialogDetail = `${formatExpenseDateLabel(date)} · ${title} · NT$ ${this.effectiveTotal}`;
     this.submitDialogMessage = this.isEditMode
       ? '確定要儲存變更嗎？若分攤金額有調整，相關付款狀態可能會重設。'
       : '確定要建立此筆帳款嗎？建立後全員皆可查看。';
@@ -571,6 +583,7 @@ export class ExpenseCreateComponent implements OnInit, OnDestroy {
 
     this.form.patchValue({
       title: expense.title,
+      date: expense.date ?? todayLocalDate(),
       totalAmount:
         expense.splitMode === 'equal' ? expense.totalAmount : null,
       billTotal: expense.billTotal ?? null,
@@ -649,6 +662,7 @@ export class ExpenseCreateComponent implements OnInit, OnDestroy {
 
     return {
       title: v.title ?? '',
+      date: v.date ?? todayLocalDate(),
       totalAmount: this.effectiveTotal,
       billTotal: this.chartBillTotal,
       payerId: v.payerId,

@@ -6,11 +6,19 @@ import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { pendingConfirmationsFor } from '../../core/utils/balance-calculator';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { ExpenseDatePipe } from '../../shared/pipes/expense-date.pipe';
+import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 
 @Component({
   selector: 'app-pending',
   standalone: true,
-  imports: [CommonModule, RouterLink, MemberAvatarComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MemberAvatarComponent,
+    ExpenseDatePipe,
+    KaomojiDecoComponent,
+  ],
   template: `
     <div class="page">
       <div class="page-title-bar">
@@ -19,20 +27,34 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
 
       <ng-container *ngIf="items$ | async as items">
         <div *ngIf="items.length === 0" class="empty-state">
-          <p class="empty-state__icon">🌈</p>
+          <app-kaomoji-deco mood="pending" seed="pending-empty" [salt]="emptySalt" />
           <p class="empty-state__text">目前沒有待確認的款項</p>
+          <button
+            type="button"
+            class="caption-text mt-2 rounded-full bg-cream px-3 py-1 active:scale-95"
+            (click)="emptySalt = emptySalt + 1"
+          >
+            🔄 換顏文字
+          </button>
         </div>
 
         <div class="list-stack">
           <div *ngFor="let item of items" class="card-stack">
             <div>
               <p class="item-title">{{ item.expense.title }}</p>
+              <p class="caption-text mt-1">{{ item.expense | expenseDate }}</p>
               <div class="mt-1 flex items-center gap-2 body-text">
                 <ng-container *ngIf="auth.getMember(item.split.memberId) as m">
                   <app-member-avatar [member]="m" />
                   <span>{{ m.name }} 已付款 NT$ {{ item.split.amount }}</span>
                 </ng-container>
               </div>
+              <app-kaomoji-deco
+                class="mt-2 block"
+                mood="pending"
+                [seed]="item.expense.id + item.split.memberId"
+                size="sm"
+              />
             </div>
             <div class="flex gap-2">
               <button
@@ -56,6 +78,8 @@ import { MemberAvatarComponent } from '../../shared/components/member-avatar.com
   `,
 })
 export class PendingComponent {
+  emptySalt = 0;
+
   items$ = combineLatest([
     this.expenses.expenses$,
     this.auth.currentMember$,

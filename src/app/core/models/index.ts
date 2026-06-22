@@ -42,6 +42,8 @@ export interface ExpenseSplit {
 export interface Expense {
   id: string;
   title: string;
+  /** 帳款日期 YYYY-MM-DD（本地） */
+  date?: string;
   totalAmount: number;
   billTotal?: number | null;
   payerId: string;
@@ -77,6 +79,7 @@ export interface BalanceEdge {
 
 export interface CreateExpenseInput {
   title: string;
+  date: string;
   totalAmount: number;
   billTotal?: number | null;
   payerId: string;
