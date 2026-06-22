@@ -2,6 +2,7 @@ import { Component, Input, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Member } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
+import { memberColorSolid, memberColorBorder } from '../../core/utils/member-color';
 import { MemberAvatarComponent } from './member-avatar.component';
 
 export interface PieSliceInput {
@@ -50,8 +51,9 @@ interface PieSegment {
           class="flex items-center gap-2 rounded-2xl bg-cream/80 px-3 py-2 body-text"
         >
           <span
-            class="h-3 w-3 shrink-0 rounded-full ring-1 ring-white"
+            class="h-3 w-3 shrink-0 rounded-full ring-1"
             [style.background-color]="s.color"
+            [style.--tw-ring-color]="memberColorBorder(s.color)"
           ></span>
           <app-member-avatar *ngIf="s.member && !s.isUnassigned" [member]="s.member" size="sm" />
           <span *ngIf="s.isUnassigned" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink/10 caption-text">
@@ -66,6 +68,7 @@ interface PieSegment {
   `,
 })
 export class SplitPieChartComponent implements OnChanges {
+  memberColorBorder = memberColorBorder;
   @Input() slices: PieSliceInput[] = [];
   /** 已分攤總額 */
   @Input() totalAmount = 0;
@@ -116,7 +119,7 @@ export class SplitPieChartComponent implements OnChanges {
           memberId: slice.memberId,
           amount: slice.amount,
           percent: Math.round((slice.amount / this.chartTotal) * 1000) / 10,
-          color: member?.color ?? '#FFB5A7',
+          color: memberColorSolid(member?.color ?? '#FFB5A7'),
           label: member?.name ?? slice.memberId,
           member,
         };

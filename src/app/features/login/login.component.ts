@@ -49,12 +49,11 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
           <app-deco-illustration kind="group" alt="許家五人" />
         </div>
 
-        <div class="relative z-10 grid w-full max-w-sm grid-cols-2 gap-3">
+        <div class="relative z-10 flex w-full max-w-sm flex-wrap justify-center gap-3">
           <button
-            *ngFor="let member of members; let last = last"
+            *ngFor="let member of members"
             type="button"
-            class="flex flex-col items-center gap-2 rounded-3xl bg-white p-4 shadow-sm transition active:scale-[0.97]"
-            [class.col-span-2]="last && members.length % 2 === 1"
+            class="flex w-[calc(50%-0.375rem)] flex-col items-center gap-2 rounded-3xl bg-white p-4 shadow-sm transition active:scale-[0.97]"
             (click)="selectMember(member)"
           >
             <app-member-avatar [member]="member" size="lg" />

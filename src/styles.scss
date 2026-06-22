@@ -174,7 +174,8 @@ a:focus-visible {
   }
 
   .amount-highlight {
-    @apply text-base font-bold tabular-nums text-coral;
+    @apply text-base font-bold tabular-nums;
+    color: color-mix(in srgb, var(--theme-coral) 72%, var(--theme-ink));
   }
 
   .text-link {
@@ -197,6 +198,14 @@ a:focus-visible {
 
   .inset-panel {
     @apply rounded-2xl bg-cream p-3;
+  }
+
+  .rank-row {
+    border-left: 4px solid var(--rank-accent, var(--theme-peach));
+  }
+
+  .rank-row {
+    border-left: 4px solid var(--rank-accent, var(--theme-peach));
   }
 
   .empty-state {
@@ -238,7 +247,9 @@ a:focus-visible {
   }
 
   .deco-illustration--stickers {
-    @apply w-full max-w-[14rem] opacity-80;
+    width: 100%;
+    max-width: 14rem;
+    opacity: 0.8;
   }
 
   .deco-banner {
@@ -262,6 +273,42 @@ a:focus-visible {
 
   .kaomoji-deco--sm {
     @apply text-xl;
+  }
+
+  .theme-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .theme-swatch {
+    position: relative;
+    aspect-ratio: 1;
+    width: 100%;
+    border-radius: 1rem;
+    border: 2px solid color-mix(in srgb, var(--theme-ink) 8%, transparent);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
+  .theme-swatch--selected {
+    border-color: var(--theme-coral);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-coral) 35%, transparent);
+  }
+
+  .theme-swatch__check {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--theme-ink) 55%, transparent);
   }
 
   .member-chibi-head {
@@ -432,6 +479,16 @@ a:focus-visible {
 
   .bg-coral\/20 {
     background-color: color-mix(in srgb, var(--theme-coral) 20%, transparent);
+  }
+
+  .card-highlight-rank {
+    background-color: color-mix(in srgb, var(--theme-peach) 14%, var(--theme-cream));
+    border: 1px solid color-mix(in srgb, var(--theme-peach) 24%, transparent);
+  }
+
+  .card-highlight-debt {
+    background-color: color-mix(in srgb, var(--theme-coral) 16%, var(--theme-cream));
+    border: 1px solid color-mix(in srgb, var(--theme-coral) 24%, transparent);
   }
 }
 

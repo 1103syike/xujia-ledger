@@ -6,10 +6,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { MemberProfileService } from '../../core/services/member-profile.service';
 import { ThemeService } from '../../core/services/theme.service';
 import {
+  MEMBER_COLOR_OPTIONS,
   THEME_PRESETS,
   ThemePresetId,
   displayNameOf,
   getThemePreset,
+  memberColorLabel,
+  normalizeThemePresetId,
 } from '../../core/models';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
@@ -42,42 +45,63 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
 
         <div>
           <label class="field-label">代表色</label>
-          <p class="helper-text mb-1">用於標籤與分攤顯示，頭像為固定 Q 版造型</p>
-          <input type="color" class="h-12 w-full rounded-2xl" [(ngModel)]="color" />
+          <p class="helper-text mb-2">用於標籤與分攤顯示，頭像為固定 Q 版造型</p>
+
+          <div class="theme-swatch-grid">
+            <button
+              *ngFor="let option of memberColorOptions"
+              type="button"
+              class="theme-swatch"
+              [class.theme-swatch--selected]="isColorSelected(option.value)"
+              [style.background-color]="option.value"
+              [attr.aria-label]="option.name"
+              [attr.aria-pressed]="isColorSelected(option.value)"
+              (click)="selectColor(option.value)"
+            >
+              <span
+                *ngIf="isColorSelected(option.value)"
+                class="theme-swatch__check"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+            </button>
+          </div>
+
+          <p class="caption-text mt-2 text-center" *ngIf="selectedColorName">
+            已選：{{ selectedColorName }}
+          </p>
         </div>
       </div>
 
       <div class="card-stack">
-        <p class="card-title">主題配色</p>
+        <p class="card-title">背景色</p>
         <p class="helper-text">選擇後請按「儲存設定」才會套用至全站</p>
 
-        <button
-          *ngFor="let preset of themePresets"
-          type="button"
-          class="flex w-full items-center gap-3 rounded-2xl p-3 text-left transition active:scale-[0.99]"
-          [class.ring-2]="themePresetId === preset.id"
-          [class.ring-peach-40]="themePresetId === preset.id"
-          [class.bg-peach-15]="themePresetId === preset.id"
-          [class.bg-cream]="themePresetId !== preset.id"
-          (click)="selectTheme(preset.id)"
-        >
-          <div
-            class="flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl shadow-sm"
-            [style.background]="themePreviewGradient(preset.id)"
-          ></div>
-          <div class="min-w-0 flex-1">
-            <p class="item-title">
-              {{ preset.emoji }} {{ preset.name }}
-            </p>
-            <p class="caption-text">{{ preset.description }}</p>
-          </div>
-          <span
-            *ngIf="themePresetId === preset.id"
-            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-peach text-xs text-white"
+        <div class="theme-swatch-grid">
+          <button
+            *ngFor="let preset of themePresets"
+            type="button"
+            class="theme-swatch"
+            [class.theme-swatch--selected]="themePresetId === preset.id"
+            [style.background-color]="preset.colors.cream"
+            [attr.aria-label]="preset.name"
+            [attr.aria-pressed]="themePresetId === preset.id"
+            (click)="selectTheme(preset.id)"
           >
-            ✓
-          </span>
-        </button>
+            <span
+              *ngIf="themePresetId === preset.id"
+              class="theme-swatch__check"
+              aria-hidden="true"
+            >
+              ✓
+            </span>
+          </button>
+        </div>
+
+        <p class="caption-text text-center" *ngIf="selectedThemeName">
+          已選：{{ selectedThemeName }}
+        </p>
       </div>
 
       <div class="card-stack">
@@ -139,12 +163,13 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
 })
 export class SettingsComponent implements OnDestroy {
   themePresets = THEME_PRESETS;
+  memberColorOptions = MEMBER_COLOR_OPTIONS;
   displayNameOf = displayNameOf;
 
   nickname = '';
   emoji = '';
   color = '';
-  themePresetId: ThemePresetId = 'peach-soda';
+  themePresetId: ThemePresetId = 'milk-peach';
   currentPassword = '';
   newPassword = '';
   message = '';
@@ -164,9 +189,20 @@ export class SettingsComponent implements OnDestroy {
     });
   }
 
-  themePreviewGradient(id: ThemePresetId): string {
-    const c = getThemePreset(id).colors;
-    return `conic-gradient(from -45deg, ${c.peach}, ${c.mint}, ${c.lavender}, ${c.coral}, ${c.peach})`;
+  get selectedThemeName(): string {
+    return getThemePreset(this.themePresetId).name;
+  }
+
+  get selectedColorName(): string | null {
+    return memberColorLabel(this.color);
+  }
+
+  isColorSelected(value: string): boolean {
+    return this.color.toUpperCase() === value.toUpperCase();
+  }
+
+  selectColor(value: string): void {
+    this.color = value;
   }
 
   selectTheme(id: ThemePresetId): void {
@@ -183,7 +219,7 @@ export class SettingsComponent implements OnDestroy {
     this.nickname = me.nickname;
     this.emoji = me.emoji;
     this.color = me.color;
-    this.themePresetId = me.themePresetId;
+    this.themePresetId = normalizeThemePresetId(me.themePresetId);
     this.themeService.applyForMember(me);
   }
 

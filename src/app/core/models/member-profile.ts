@@ -8,70 +8,179 @@ export interface ThemeColors {
   coral: string;
 }
 
-export type ThemePresetId = 'peach-soda' | 'mint-day' | 'lavender-moon';
+export type ThemePresetId =
+  | 'milk-powder'
+  | 'milk-peach'
+  | 'milk-orange'
+  | 'milk-yellow'
+  | 'milk-green'
+  | 'milk-mint'
+  | 'milk-blue'
+  | 'milk-lavender'
+  | 'milk-rose'
+  | 'milk-apricot'
+  | 'milk-coral'
+  | 'milk-vanilla'
+  | 'milk-oat'
+  | 'milk-sakura'
+  | 'milk-sky'
+  | 'milk-lilac'
+  | 'peach-soda'
+  | 'mint-day'
+  | 'lavender-moon';
 
 export interface ThemePreset {
   id: ThemePresetId;
   name: string;
-  emoji: string;
-  description: string;
   colors: ThemeColors;
 }
 
-/** 蜜桃汽水 — 溫暖可愛，預設風格 */
-const PEACH_SODA: ThemePreset = {
-  id: 'peach-soda',
-  name: '蜜桃汽水',
-  emoji: '🍑',
-  description: '暖桃粉與奶油白，溫暖而明亮',
-  colors: {
-    peach: '#FFB5A7',
+function preset(
+  id: ThemePresetId,
+  name: string,
+  colors: ThemeColors
+): ThemePreset {
+  return { id, name, colors };
+}
+
+export const THEME_PRESETS: ThemePreset[] = [
+  preset('milk-powder', '奶粉', {
+    cream: '#FFF0F0',
+    peach: '#FFD4D4',
+    mint: '#E8F5E8',
+    lavender: '#F0E0F0',
+    coral: '#FF9EAA',
+  }),
+  preset('milk-peach', '奶桃', {
     cream: '#FFF8F0',
+    peach: '#FFB5A7',
     mint: '#B8E8D1',
     lavender: '#D4C1EC',
     coral: '#FF8FAB',
-  },
-};
-
-/** 薄荷午後 — 清新涼爽 */
-const MINT_DAY: ThemePreset = {
-  id: 'mint-day',
-  name: '薄荷午後',
-  emoji: '🌿',
-  description: '薄荷綠與冰涼白，清新而舒適',
-  colors: {
+  }),
+  preset('milk-orange', '奶橘', {
+    cream: '#FFF3E8',
+    peach: '#FFC9A3',
+    mint: '#C8E6C9',
+    lavender: '#E8D5C4',
+    coral: '#FF9F6B',
+  }),
+  preset('milk-yellow', '奶黃', {
+    cream: '#FFFCF0',
+    peach: '#FFE8A3',
+    mint: '#D4EDDA',
+    lavender: '#F5E6C8',
+    coral: '#FFB84D',
+  }),
+  preset('milk-green', '奶綠', {
+    cream: '#F4FAF5',
+    peach: '#A8D5BA',
+    mint: '#B8E8D1',
+    lavender: '#C8E6C9',
+    coral: '#6BBF8A',
+  }),
+  preset('milk-mint', '奶薄荷', {
+    cream: '#F0FAF5',
     peach: '#6ECFAD',
-    cream: '#F2FBF7',
     mint: '#B8E8D1',
     lavender: '#9DD9C5',
     coral: '#3DA882',
-  },
-};
-
-/** 薰衣草月夜 — 柔和夢幻 */
-const LAVENDER_MOON: ThemePreset = {
-  id: 'lavender-moon',
-  name: '薰衣草月夜',
-  emoji: '🌙',
-  description: '淡紫與霧白，柔和而寧靜',
-  colors: {
-    peach: '#C4B5FD',
+  }),
+  preset('milk-blue', '奶藍', {
+    cream: '#F3F8FF',
+    peach: '#A0C4FF',
+    mint: '#B8D4F0',
+    lavender: '#C4D7F0',
+    coral: '#6B9FFF',
+  }),
+  preset('milk-lavender', '奶紫', {
     cream: '#F7F5FF',
+    peach: '#C4B5FD',
     mint: '#DDD6FE',
     lavender: '#A78BFA',
     coral: '#8B5CF6',
-  },
+  }),
+  preset('milk-rose', '奶玫', {
+    cream: '#FFF5F8',
+    peach: '#FFB7C5',
+    mint: '#F0D4E0',
+    lavender: '#E8C4D4',
+    coral: '#FF6B8A',
+  }),
+  preset('milk-apricot', '杏奶', {
+    cream: '#FFF9F2',
+    peach: '#FFD4A8',
+    mint: '#E0E8C8',
+    lavender: '#F0E0D0',
+    coral: '#FFAA5C',
+  }),
+  preset('milk-coral', '奶珊瑚', {
+    cream: '#FFF5F2',
+    peach: '#FFB8A8',
+    mint: '#FFD4C8',
+    lavender: '#F5D0C8',
+    coral: '#FF7F6B',
+  }),
+  preset('milk-vanilla', '香草奶', {
+    cream: '#FFFCF5',
+    peach: '#F5E6D3',
+    mint: '#E8F0E0',
+    lavender: '#EDE4D4',
+    coral: '#E8C4A0',
+  }),
+  preset('milk-oat', '燕麥奶', {
+    cream: '#FAF7F2',
+    peach: '#E8D8C4',
+    mint: '#D8E4D0',
+    lavender: '#E0D8E8',
+    coral: '#C9A882',
+  }),
+  preset('milk-sakura', '櫻奶', {
+    cream: '#FFF7F9',
+    peach: '#FFD6E0',
+    mint: '#F0E8F0',
+    lavender: '#F5D0E0',
+    coral: '#FF8FAB',
+  }),
+  preset('milk-sky', '晴空奶', {
+    cream: '#F5FAFF',
+    peach: '#B8D4F8',
+    mint: '#D0E8F8',
+    lavender: '#C8E0F8',
+    coral: '#7EB8FF',
+  }),
+  preset('milk-lilac', '淡紫奶', {
+    cream: '#FAF8FF',
+    peach: '#D4C8F0',
+    mint: '#E0D8F5',
+    lavender: '#B8A8E8',
+    coral: '#9B7FD4',
+  }),
+];
+
+const LEGACY_PRESET_ALIASES: Record<string, ThemePresetId> = {
+  'peach-soda': 'milk-peach',
+  'mint-day': 'milk-mint',
+  'lavender-moon': 'milk-lavender',
 };
 
-export const THEME_PRESETS: ThemePreset[] = [PEACH_SODA, MINT_DAY, LAVENDER_MOON];
+export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'milk-peach';
 
-export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'peach-soda';
+export const DEFAULT_THEME: ThemeColors = THEME_PRESETS[1].colors;
 
-export const DEFAULT_THEME: ThemeColors = PEACH_SODA.colors;
+export function normalizeThemePresetId(id?: string | null): ThemePresetId {
+  const aliased = LEGACY_PRESET_ALIASES[id ?? ''];
+  if (aliased) return aliased;
+  if (THEME_PRESETS.some((p) => p.id === id)) {
+    return id as ThemePresetId;
+  }
+  return DEFAULT_THEME_PRESET_ID;
+}
 
 export function getThemePreset(id?: string | null): ThemePreset {
+  const resolved = normalizeThemePresetId(id);
   return (
-    THEME_PRESETS.find((p) => p.id === id) ??
+    THEME_PRESETS.find((p) => p.id === resolved) ??
     THEME_PRESETS.find((p) => p.id === DEFAULT_THEME_PRESET_ID)!
   );
 }
@@ -81,14 +190,14 @@ export function resolveThemeColors(
   legacyTheme?: Partial<ThemeColors> | null,
   storedPreset = false
 ): ThemeColors {
-  const preset = getThemePreset(themePresetId);
+  const presetColors = getThemePreset(themePresetId).colors;
   if (storedPreset) {
-    return { ...preset.colors };
+    return { ...presetColors };
   }
   if (legacyTheme && Object.keys(legacyTheme).length > 0) {
-    return { ...preset.colors, ...legacyTheme };
+    return { ...presetColors, ...legacyTheme };
   }
-  return { ...preset.colors };
+  return { ...presetColors };
 }
 
 export interface MemberProfile {
@@ -115,4 +224,36 @@ export interface DisplayMember {
 
 export function displayNameOf(member: Pick<DisplayMember, 'nickname' | 'name'>): string {
   return member.nickname.trim() || member.name;
+}
+
+export interface MemberColorOption {
+  name: string;
+  value: string;
+}
+
+/** 代表色預設：奶奶系柔和色（用於標籤與分攤） */
+export const MEMBER_COLOR_OPTIONS: MemberColorOption[] = [
+  { name: '奶桃', value: '#FFB5A7' },
+  { name: '奶粉', value: '#FFD4D4' },
+  { name: '奶橘', value: '#FFC9A3' },
+  { name: '奶黃', value: '#FFE8A3' },
+  { name: '奶綠', value: '#B8E8D1' },
+  { name: '薄荷奶', value: '#6ECFAD' },
+  { name: '奶藍', value: '#A0C4FF' },
+  { name: '奶紫', value: '#D4C1EC' },
+  { name: '奶玫', value: '#FFB7C5' },
+  { name: '杏奶', value: '#FFD6A5' },
+  { name: '奶珊瑚', value: '#FFB8A8' },
+  { name: '香草奶', value: '#F5E6D3' },
+  { name: '燕麥奶', value: '#E8D8C4' },
+  { name: '櫻奶', value: '#FFD6E0' },
+  { name: '晴空奶', value: '#B8D4F8' },
+  { name: '淡紫奶', value: '#C4B5FD' },
+];
+
+export function memberColorLabel(color: string): string | null {
+  const hit = MEMBER_COLOR_OPTIONS.find(
+    (o) => o.value.toUpperCase() === color.toUpperCase()
+  );
+  return hit?.name ?? null;
 }

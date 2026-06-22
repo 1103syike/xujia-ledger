@@ -21,6 +21,11 @@ import {
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { ExpenseDatePipe } from '../../shared/pipes/expense-date.pipe';
 import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
+import {
+  memberColorBorder,
+  memberColorSoftBg,
+  memberColorSolid,
+} from '../../core/utils/member-color';
 
 @Component({
   selector: 'app-dashboard',
@@ -47,7 +52,7 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
         <p class="helper-text mt-1">點選查看詳情 (・∀・)ノ</p>
       </a>
 
-      <section class="card bg-peach/10" *ngIf="vm.debtRanking.length > 0">
+      <section class="card card-highlight-rank" *ngIf="vm.debtRanking.length > 0">
         <div class="flex items-start justify-between gap-2">
           <div>
             <p class="card-title">🏆 許家負債排行榜</p>
@@ -65,7 +70,8 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
         <div class="stack-sm mt-3">
           <div
             *ngFor="let entry of vm.debtRanking.slice(0, 3); let i = index"
-            class="inset-panel flex items-center gap-3"
+            class="inset-panel rank-row flex items-center gap-3"
+            [style.--rank-accent]="memberColorSolid(auth.getMember(entry.memberId)?.color || '')"
           >
             <span class="text-lg leading-none">{{ rankMedal(i) }}</span>
             <ng-container *ngIf="auth.getMember(entry.memberId) as member">
@@ -86,7 +92,7 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
         </div>
       </section>
 
-      <section class="card bg-coral/20" *ngIf="vm.myDebtors.length > 0">
+      <section class="card card-highlight-debt" *ngIf="vm.myDebtors.length > 0">
         <div class="flex items-start justify-between gap-2">
           <div>
             <p class="card-title">📣 欠我錢的人</p>
@@ -103,7 +109,8 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
         <div class="stack-sm mt-3">
           <div
             *ngFor="let debtor of vm.myDebtors"
-            class="inset-panel"
+            class="inset-panel rank-row"
+            [style.--rank-accent]="memberColorSolid(auth.getMember(debtor.memberId)?.color || '')"
           >
             <div class="flex items-center gap-3">
               <ng-container *ngIf="auth.getMember(debtor.memberId) as member">
@@ -216,7 +223,8 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
             <span
               *ngFor="let split of expense.splits"
               class="chip inline-flex items-center gap-1.5"
-              [style.background-color]="(auth.getMember(split.memberId)?.color || '#ccc') + '44'"
+              [style.background-color]="memberColorSoftBg(auth.getMember(split.memberId)?.color || '')"
+              [style.box-shadow]="'inset 0 0 0 1px ' + memberColorBorder(auth.getMember(split.memberId)?.color || '')"
             >
               <app-member-avatar
                 *ngIf="auth.getMember(split.memberId) as splitMember"
@@ -242,6 +250,9 @@ import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.compo
 export class DashboardComponent {
   rankTitle = rankTitle;
   quoteCounts = quoteCounts();
+  memberColorSolid = memberColorSolid;
+  memberColorSoftBg = memberColorSoftBg;
+  memberColorBorder = memberColorBorder;
   copiedId: string | null = null;
   rankSalt = 0;
   debtorCardSalt = 0;

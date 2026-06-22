@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{html,ts}'],
+  safelist: [{ pattern: /^deco-illustration--/ }],
   theme: {
     extend: {
       colors: {

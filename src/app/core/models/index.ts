@@ -3,13 +3,16 @@ export type SplitMode = 'equal' | 'itemized';
 export type ExpenseStatus = 'open' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'marked' | 'confirmed';
 
-export type { DisplayMember, MemberProfile, ThemeColors, ThemePreset, ThemePresetId } from './member-profile';
+export type { DisplayMember, MemberColorOption, MemberProfile, ThemeColors, ThemePreset, ThemePresetId } from './member-profile';
 export {
   DEFAULT_THEME,
   DEFAULT_THEME_PRESET_ID,
   displayNameOf,
   FIREBASE_INTERNAL_PASSWORD,
   getThemePreset,
+  memberColorLabel,
+  MEMBER_COLOR_OPTIONS,
+  normalizeThemePresetId,
   resolveThemeColors,
   THEME_PRESETS,
 } from './member-profile';
