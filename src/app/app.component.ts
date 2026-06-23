@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
-import { KaomojiLoadingComponent } from './shared/components/kaomoji-loading.component';
+import { KaomojiLoadingComponent } from './shared/components/branding/kaomoji-loading.component';
 
 @Component({
   selector: 'app-root',

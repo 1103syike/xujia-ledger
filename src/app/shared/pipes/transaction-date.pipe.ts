@@ -1,5 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
-import { formatTransactionDateLabel, normalizeTransactionDate } from '../../core/utils/transaction-date';
+import { formatTransactionDateLabel, normalizeTransactionDate } from '../../core/transactions/transaction-date';
 
 @Pipe({ name: 'transactionDate', standalone: true })
 export class TransactionDatePipe implements PipeTransform {

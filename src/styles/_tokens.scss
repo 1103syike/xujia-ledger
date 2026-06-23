@@ -1,0 +1,155 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 許家帳本 · Design Tokens v1.0
+// ThemeService 執行時覆寫 --theme-*；語意 token 必須引用 --theme-*，不可綁死 --ds-*。
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  /* ── Runtime theme（ThemeService 覆寫這組）── */
+  --theme-peach: #ffb5a7;
+  --theme-cream: #fff8f0;
+  --theme-mint: #b8e8d1;
+  --theme-lavender: #d4c1ec;
+  --theme-coral: #ff8fab;
+  --theme-ink: #3d3d3d;
+  --theme-positive: #1a9d62;
+  --theme-debt: #e02525;
+
+  /* ── 別名：跟隨 theme，供 SCSS 混用 ── */
+  --ds-peach: var(--theme-peach);
+  --ds-cream: var(--theme-cream);
+  --ds-mint: var(--theme-mint);
+  --ds-lavender: var(--theme-lavender);
+  --ds-coral: var(--theme-coral);
+  --ds-ink: var(--theme-ink);
+  --ds-positive: var(--theme-positive);
+  --ds-debt: var(--theme-debt);
+  --ds-white: #ffffff;
+
+  /* ── Semantic colors ── */
+  --color-bg: var(--theme-cream);
+  --color-surface: var(--ds-white);
+  --color-surface-inset: var(--theme-cream);
+  --color-surface-muted: color-mix(in srgb, var(--theme-cream) 88%, var(--ds-white));
+  --color-surface-overlay: rgb(0 0 0 / 25%);
+
+  --color-text: var(--theme-ink);
+  --color-text-secondary: color-mix(in srgb, var(--theme-ink) 55%, transparent);
+  --color-text-muted: color-mix(in srgb, var(--theme-ink) 45%, transparent);
+  --color-text-hint: color-mix(in srgb, var(--theme-ink) 50%, transparent);
+  --color-text-disabled: color-mix(in srgb, var(--theme-ink) 35%, transparent);
+  --color-text-on-primary: var(--ds-white);
+
+  --color-brand-peach: var(--theme-peach);
+  --color-brand-coral: var(--theme-coral);
+  --color-brand-mint: var(--theme-mint);
+  --color-brand-lavender: var(--theme-lavender);
+
+  --color-action-primary: var(--theme-peach);
+  --color-btn-primary-bg: color-mix(in srgb, var(--theme-coral) 78%, var(--theme-ink));
+  --color-btn-primary-text: var(--ds-white);
+  --color-action-danger: var(--theme-coral);
+  --color-link: var(--theme-coral);
+  --color-focus: var(--theme-coral);
+
+  --color-positive: var(--theme-positive);
+  --color-debt: var(--theme-debt);
+
+  --color-border: color-mix(in srgb, var(--theme-peach) 20%, transparent);
+  --color-border-input: color-mix(in srgb, var(--theme-peach) 30%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--theme-peach) 25%, transparent);
+  --color-divider: color-mix(in srgb, var(--theme-peach) 15%, transparent);
+
+  /* ── Spacing (4pt base, 8pt rhythm) ── */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ── Layout ── */
+  --layout-page-padding-x: var(--space-4);
+  --layout-page-gap: var(--space-4);
+  --layout-section-gap: var(--space-3);
+  --layout-card-gap: var(--space-3);
+  --layout-card-padding: var(--space-4);
+  --layout-inset-padding: var(--space-3);
+  --layout-header-min-height: 2.75rem;
+  --layout-touch-target: 2.75rem;
+  --layout-bottom-nav-height: 4.25rem;
+  --layout-max-width: 28rem;
+  --layout-safe-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  --layout-safe-top: max(0.5rem, env(safe-area-inset-top, 0px));
+
+  /* ── Typography ── */
+  --font-family-sans: 'Noto Sans TC', system-ui, sans-serif;
+  --font-family-emoji: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+
+  --font-size-2xs: 0.625rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-wide: 0.05em;
+
+  /* ── Radius ── */
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-full: 9999px;
+
+  /* ── Elevation ── */
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 5%);
+  --shadow-2: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%);
+  --shadow-inset: inset 0 0 0 1px var(--color-border-input);
+  --shadow-focus-ring: 0 0 0 2px color-mix(in srgb, var(--color-focus) 35%, transparent);
+
+  /* ── Motion ── */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 280ms;
+  --ease-default: ease;
+  --ease-out: ease-out;
+  --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ── Z-index ── */
+  --z-sticky-header: 10;
+  --z-submit-bar: 20;
+  --z-modal: 30;
+  --z-sheet: 40;
+
+  /* ── Component sizes ── */
+  --btn-height: var(--layout-touch-target);
+  --btn-padding-x: var(--space-6);
+  --btn-padding-y: var(--space-3);
+  --btn-sm-padding-x: var(--space-4);
+  --btn-sm-padding-y: var(--space-2);
+
+  --input-height: var(--layout-touch-target);
+  --input-padding-x: var(--space-4);
+  --input-padding-y: var(--space-3);
+
+  --icon-sm: 1.25rem;
+  --icon-md: 1.375rem;
+  --icon-lg: 1.5rem;
+}

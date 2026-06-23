@@ -5,7 +5,7 @@ import {
   ref,
   uploadBytes,
 } from 'firebase/storage';
-import { firebaseStorage } from '../firebase';
+import { firebaseStorage } from '../config/firebase';
 import { AvatarSlotId } from '../models';
 
 @Injectable({ providedIn: 'root' })

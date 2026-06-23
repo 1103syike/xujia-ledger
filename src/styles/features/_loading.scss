@@ -1,0 +1,26 @@
+/* ── Loading ── */
+
+@keyframes loading-bar-slide {
+  0% {
+    width: 8%;
+    margin-left: 0;
+  }
+  50% {
+    width: 72%;
+    margin-left: 14%;
+  }
+  100% {
+    width: 8%;
+    margin-left: 92%;
+  }
+}
+
+.loading-bar {
+  background: linear-gradient(
+    90deg,
+    var(--ds-peach),
+    var(--ds-coral),
+    var(--ds-lavender)
+  );
+  animation: loading-bar-slide 1.35s ease-in-out infinite;
+}

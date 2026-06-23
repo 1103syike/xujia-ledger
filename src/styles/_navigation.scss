@@ -1,0 +1,112 @@
+@import './mixins';
+
+/* ── Navigation ── */
+
+.bottom-nav {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bottom-nav__link {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) 0;
+  text-decoration: none;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  transition: transform var(--duration-fast) var(--ease-default);
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.bottom-nav__link--active {
+  color: var(--color-link);
+}
+
+.bottom-nav__icon {
+  display: grid;
+  height: var(--space-8);
+  width: var(--space-8);
+  flex-shrink: 0;
+  place-items: center;
+  overflow: hidden;
+  font-family: var(--font-family-emoji);
+  font-size: var(--icon-md);
+  line-height: 1;
+}
+
+.bottom-nav__label {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+}
+
+.consolidate-action-bar {
+  bottom: calc(var(--layout-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+}
+
+.sheet-panel {
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  animation: sheet-up var(--duration-slow) var(--ease-out);
+}
+
+.member-filter-bar {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
+  -webkit-overflow-scrolling: touch;
+}
+
+.member-filter-chip {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--duration-fast),
+    background-color var(--duration-fast);
+
+  &--active {
+    border-color: var(--filter-accent, var(--ds-peach));
+    background-color: color-mix(
+      in srgb,
+      var(--filter-accent, var(--ds-peach)) 12%,
+      var(--color-surface)
+    );
+  }
+}
+
+.member-filter-chip__all {
+  display: flex;
+  height: var(--space-8);
+  width: var(--space-8);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.member-filter-chip__label {
+  max-width: 3.5rem;
+  font-size: var(--font-size-2xs);
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  @include truncate;
+}

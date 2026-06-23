@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { BehaviorSubject, map } from 'rxjs';
-import { firestoreDb } from '../firebase';
+import { firestoreDb } from '../config/firebase';
 import {
   AuditLog,
   CreateAdvanceInput,
@@ -25,25 +25,25 @@ import {
   buildConsolidationPreview,
   consolidationToParticipants,
   validateConsolidationInput,
-} from '../utils/debt-consolidation';
+} from '../consolidation/debt-consolidation';
 import {
   buildSplitPreview,
   previewToParticipants,
   validateCreateInput,
   validateRepaymentInput,
-} from '../utils/split-calculator';
+} from '../transactions/split-calculator';
 import {
   advanceMemberBalances,
   advanceChangeAmount,
   primaryPayerId,
-} from '../utils/advance-allocation';
-import { attachPayerChangeLineItems } from '../utils/advance-display';
-import { diffAdvanceUpdate } from '../utils/advance-audit-diff';
-import { formatFirestoreError, stripUndefined } from '../utils/firestore-data';
+} from '../transactions/advance-allocation';
+import { attachPayerChangeLineItems } from '../transactions/advance-display';
+import { diffAdvanceUpdate } from '../transactions/advance-audit-diff';
+import { formatFirestoreError, stripUndefined } from '../infra/firestore-data';
 import {
   compareTransactionsByDate,
   normalizeTransaction,
-} from '../utils/transaction-date';
+} from '../transactions/transaction-date';
 import { AuthService } from './auth.service';
 import { COPY_ERRORS, COPY_RECORD_TYPE } from '../../copy';
 

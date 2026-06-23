@@ -1,182 +1,328 @@
-    <div class="page" *ngIf="vm$ | async as vm">
-      <div class="page-title-bar">
-        <h2 class="page-title">首頁</h2>
+<div class="page dashboard-page" *ngIf="vm$ | async as vm">
+  <!-- ① Hero：目前帳務 -->
+  <section
+    class="dashboard-hero"
+    [class.dashboard-hero--clear]="vm.hero.isClear"
+    [attr.aria-label]="pages.currentLedger"
+  >
+    <p class="dashboard-hero__eyebrow">{{ pages.currentLedger }}</p>
+
+    <ng-container *ngIf="vm.hero.isClear; else heroBalances">
+      <app-kaomoji-deco mood="celebrate" [salt]="clearSalt" seed="clear" />
+      <p class="dashboard-hero__amount text-ink">{{ pages.ledgerClear }}</p>
+      <p class="helper-text">{{ clearQuipLine(vm.memberId) }}</p>
+      <button
+        type="button"
+        class="dashboard-refresh-btn"
+        (click)="refreshClearQuote()"
+      >
+        {{ actions.refreshCopy }}
+      </button>
+    </ng-container>
+
+    <ng-template #heroBalances>
+      <div class="text-center">
+        <p
+          class="dashboard-hero__amount"
+          [class.text-debt]="vm.hero.netBalance < 0"
+          [class.text-positive]="vm.hero.netBalance > 0"
+          [class.text-ink]="vm.hero.netBalance === 0"
+        >
+          <ng-container *ngIf="vm.hero.netBalance < 0">{{
+            formatOweAmount(-vm.hero.netBalance)
+          }}</ng-container>
+          <ng-container *ngIf="vm.hero.netBalance > 0">{{
+            formatOwedAmount(vm.hero.netBalance)
+          }}</ng-container>
+          <ng-container *ngIf="vm.hero.netBalance === 0">NT$ 0</ng-container>
+        </p>
+        <p class="dashboard-hero__label">
+          {{
+            vm.hero.netBalance < 0
+              ? pages.netOwe
+              : vm.hero.netBalance > 0
+                ? pages.netReceive
+                : pages.ledgerClear
+          }}
+        </p>
       </div>
 
-      <section class="card card-highlight-debt">
-        <p class="card-title">{{ pages.oweNow }}</p>
-        <div *ngIf="vm.mySettlements.length === 0" class="empty-state py-4">
-          <app-kaomoji-deco mood="celebrate" [salt]="clearSalt" seed="clear" />
-          <p class="empty-state__text">{{ clearQuipLine(vm.memberId) }}</p>
+      <div class="dashboard-hero__pills">
+        <div class="dashboard-hero__pill dashboard-hero__pill--owe">
+          <span class="dashboard-hero__pill-label">{{ pages.totalYouOwe }}</span>
+          <span class="dashboard-hero__pill-value text-debt">{{
+            formatOweAmount(vm.hero.totalOwe)
+          }}</span>
         </div>
-        <div *ngIf="vm.mySettlements.length > 0" class="stack-sm mt-2">
-          <div
-            *ngFor="let s of vm.mySettlements"
-            class="inset-panel flex items-center justify-between gap-3"
-          >
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-3 text-left"
-              (click)="openPairSettlement(vm.activeTransactions, vm.memberId, s)"
-            >
-              <ng-container *ngIf="auth.getMember(s.otherId) as member">
-                <app-member-avatar [member]="member" size="sm" />
-                <div class="min-w-0 flex-1">
-                  <p class="item-title">{{ member.name }}</p>
-                  <p class="caption-text">
-                    {{ s.direction === 'owe' ? pages.youOweThem : pages.theyOweYou }}
-                  </p>
-                </div>
-              </ng-container>
-            </button>
-            <a
-              *ngIf="s.direction === 'owe'"
-              [routerLink]="['/transactions/new']"
-              [queryParams]="{ type: 'repayment', to: s.otherId }"
-              class="btn-primary btn-sm shrink-0"
-            >
-              {{ actions.goRepay }}
-            </a>
-            <button
-              type="button"
-              class="amount-highlight shrink-0"
-              [class.text-debt]="s.direction === 'owe'"
-              [class.text-positive]="s.direction === 'owed'"
-              (click)="openPairSettlement(vm.activeTransactions, vm.memberId, s)"
-            >
-              {{ s.direction === 'owe' ? formatOweAmount(s.amount) : formatOwedAmount(s.amount) }}
-            </button>
-          </div>
+        <div class="dashboard-hero__pill dashboard-hero__pill--owed">
+          <span class="dashboard-hero__pill-label">{{ pages.totalOwedYou }}</span>
+          <span class="dashboard-hero__pill-value text-positive">{{
+            formatOwedAmount(vm.hero.totalOwed)
+          }}</span>
         </div>
-      </section>
+      </div>
 
-      <section class="card card-highlight-rank" *ngIf="vm.debtRanking.length > 0">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="card-title">{{ pages.whoOwesMost }}</p>
-            <p class="helper-text mt-1">{{ pages.whoOwesMostHint }}</p>
+      <div class="dashboard-hero__action" *ngIf="vm.hero.primaryOwe as primary">
+        <p class="dashboard-hero__priority">
+          {{
+            pages.priorityRepay(
+              auth.getMember(primary.otherId)?.name ?? '',
+              formatOweAmount(primary.amount)
+            )
+          }}
+        </p>
+        <a
+          class="btn-primary"
+          [routerLink]="['/transactions/new']"
+          [queryParams]="{ type: 'repayment', to: primary.otherId }"
+        >
+          {{ actions.goRepay }}
+        </a>
+      </div>
+    </ng-template>
+  </section>
+
+  <!-- ② 跟誰有帳 -->
+  <section class="section dashboard-section dashboard-section--card">
+    <div class="section-header">
+      <h2 class="section-title">{{ pages.settlementsWith }}</h2>
+    </div>
+
+    <div *ngIf="vm.mySettlements.length > 0" class="stack-sm">
+      <div
+        *ngFor="let s of vm.mySettlements"
+        class="dashboard-settlement-row"
+        [class.dashboard-settlement-row--owe]="s.direction === 'owe'"
+        [class.dashboard-settlement-row--owed]="s.direction === 'owed'"
+      >
+        <button
+          type="button"
+          class="dashboard-settlement-row__main"
+          (click)="openPairSettlement(vm.activeTransactions, vm.memberId, s)"
+        >
+          <ng-container *ngIf="auth.getMember(s.otherId) as member">
+            <app-member-avatar [member]="member" size="sm" />
+            <div class="min-w-0 flex-1">
+              <p class="item-title">{{ member.name }}</p>
+              <p class="caption-text">
+                {{ s.direction === 'owe' ? pages.youOweThem : pages.theyOweYou }}
+              </p>
+            </div>
+          </ng-container>
+        </button>
+        <span
+          class="dashboard-settlement-row__amount"
+          [class.text-debt]="s.direction === 'owe'"
+          [class.text-positive]="s.direction === 'owed'"
+        >
+          {{
+            s.direction === 'owe'
+              ? formatOweAmount(s.amount)
+              : formatOwedAmount(s.amount)
+          }}
+        </span>
+        <a
+          *ngIf="
+            s.direction === 'owe' && vm.hero.primaryOwe?.otherId !== s.otherId
+          "
+          class="dashboard-settlement-row__link"
+          [routerLink]="['/transactions/new']"
+          [queryParams]="{ type: 'repayment', to: s.otherId }"
+        >
+          {{ actions.goRepay }}
+        </a>
+      </div>
+    </div>
+
+    <p *ngIf="vm.mySettlements.length === 0" class="dashboard-section-empty">
+      {{ pages.settlementsEmpty }}
+    </p>
+  </section>
+
+  <!-- ③ 最近記帳 -->
+  <section class="section dashboard-section dashboard-section--card">
+    <div class="section-header">
+      <h2 class="section-title">{{ pages.recentRecords }}</h2>
+      <a
+        *ngIf="vm.latestEntries.length"
+        routerLink="/transactions"
+        class="text-link"
+      >
+        {{ actions.viewAll }}
+      </a>
+    </div>
+
+    <div *ngIf="vm.latestEntries.length" class="stack-sm">
+      <a
+        *ngFor="let entry of vm.latestEntries"
+        [routerLink]="['/transactions', entry.tx.id]"
+        class="dashboard-list-cell"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="item-title truncate">{{ entry.tx.title }}</p>
+            <p class="caption-text mt-1">
+              {{ entry.tx | transactionDate }} · {{ latestMeta(entry.tx) }}
+            </p>
           </div>
-          <button type="button" class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95" (click)="refreshRankQuotes()">🔄 換文案</button>
+          <div
+            class="dashboard-list-cell__impact"
+            *ngIf="formatViewerImpact(entry.tx, vm.memberId) as impact"
+          >
+            <span
+              class="dashboard-list-cell__impact-label"
+              [class.text-positive]="impact.kind === 'receivable'"
+              [class.text-debt]="impact.kind === 'payable'"
+              [class.text-ink]="impact.kind === 'neutral'"
+            >
+              {{ impact.label }}
+            </span>
+            <span
+              *ngIf="impact.amountText"
+              class="dashboard-list-cell__impact-amount"
+              [class.text-positive]="impact.kind === 'receivable'"
+              [class.text-debt]="impact.kind === 'payable'"
+            >
+              {{ impact.amountText }}
+            </span>
+          </div>
         </div>
-        <div class="stack-sm mt-3">
+      </a>
+    </div>
+
+    <div *ngIf="vm.latestEntries.length === 0" class="dashboard-section-empty dashboard-section-empty--card">
+      <app-kaomoji-deco mood="expense" seed="latest" />
+      <p class="empty-state__text mt-2">
+        {{ empty.noRecords }}，歡迎{{ actions.addRecord }}
+      </p>
+    </div>
+  </section>
+
+  <!-- ④ 欠債排行榜 -->
+  <section class="section dashboard-section dashboard-section--card">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">{{ pages.whoOwesMost }}</h2>
+        <p class="helper-text mt-1">{{ pages.whoOwesMostHint }}</p>
+      </div>
+      <button
+        *ngIf="vm.debtRanking.length > 0"
+        type="button"
+        class="dashboard-refresh-btn shrink-0"
+        (click)="refreshRankQuotes()"
+      >
+        {{ actions.refreshCopy }}
+      </button>
+    </div>
+
+    <div *ngIf="vm.debtRanking.length > 0" class="stack-sm">
+      <button
+        type="button"
+        *ngFor="let entry of vm.debtRanking; let i = index"
+        class="dashboard-rank-row dashboard-card-row rank-row flex items-center gap-3"
+        [style.--rank-accent]="
+          memberColorSolid(auth.getMember(entry.memberId)?.color || '')
+        "
+        (click)="openDebtBreakdown(vm.activeTransactions, entry.memberId)"
+      >
+        <span class="text-lg leading-none">{{ rankMedal(i) }}</span>
+        <ng-container *ngIf="auth.getMember(entry.memberId) as member">
+          <app-member-avatar [member]="member" size="sm" />
+          <div class="min-w-0 flex-1">
+            <p class="item-title">{{ rankTitle(i) }} · {{ member.name }}</p>
+            <p class="caption-text mt-0.5">
+              {{ rankQuipLine(entry.memberId, i) }}
+            </p>
+          </div>
+        </ng-container>
+        <span class="amount-highlight shrink-0 text-sm text-debt">{{
+          formatOweAmount(entry.total)
+        }}</span>
+      </button>
+    </div>
+
+    <p *ngIf="vm.debtRanking.length === 0" class="dashboard-section-empty">
+      {{ pages.rankEmpty }}
+    </p>
+  </section>
+
+  <!-- ⑤ 提醒還款 -->
+  <section class="section dashboard-section dashboard-section--card">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">{{ pages.whoShouldRepayYou }}</h2>
+        <p class="helper-text mt-1">{{ pages.whoShouldRepayYouHint }}</p>
+      </div>
+      <button
+        *ngIf="vm.myDebtors.length > 0"
+        type="button"
+        class="dashboard-refresh-btn shrink-0"
+        (click)="refreshDebtorCardQuotes()"
+      >
+        {{ actions.refreshCopy }}
+      </button>
+    </div>
+
+    <div *ngIf="vm.myDebtors.length > 0" class="stack-sm">
+      <div
+        *ngFor="let debtor of vm.myDebtors"
+        class="dashboard-remind-card dashboard-card-row rank-row"
+        [style.--rank-accent]="
+          memberColorSolid(auth.getMember(debtor.memberId)?.color || '')
+        "
+      >
+        <div class="flex items-center gap-3">
+          <ng-container *ngIf="auth.getMember(debtor.memberId) as member">
+            <app-member-avatar [member]="member" size="sm" />
+            <div class="min-w-0 flex-1">
+              <p class="item-title">{{ member.name }}</p>
+              <p class="caption-text mt-0.5">
+                {{ debtorQuipLine(debtor.memberId, vm.memberId) }}
+              </p>
+            </div>
+          </ng-container>
+          <span class="amount-highlight shrink-0 text-sm text-positive">{{
+            formatOwedAmount(debtor.amount)
+          }}</span>
+        </div>
+        <p class="dashboard-remind-card__quote helper-text italic">
+          「{{ roastPreview(debtor.memberId, debtor.amount) }}」
+        </p>
+        <div class="flex gap-2">
           <button
             type="button"
-            *ngFor="let entry of vm.debtRanking.slice(0, 3); let i = index"
-            class="inset-panel rank-row flex w-full items-center gap-3 text-left"
-            [style.--rank-accent]="memberColorSolid(auth.getMember(entry.memberId)?.color || '')"
-            (click)="openDebtBreakdown(vm.activeTransactions, entry.memberId)"
+            class="btn-secondary btn-sm flex-1"
+            (click)="refreshDebtorQuote(debtor.memberId)"
           >
-            <span class="text-lg leading-none">{{ rankMedal(i) }}</span>
-            <ng-container *ngIf="auth.getMember(entry.memberId) as member">
-              <app-member-avatar [member]="member" size="sm" />
-              <div class="min-w-0 flex-1">
-                <p class="item-title">{{ rankTitle(i) }} · {{ member.name }}</p>
-                <p class="caption-text mt-0.5">{{ rankQuipLine(entry.memberId, i) }}</p>
-              </div>
-            </ng-container>
-            <span
-              class="amount-highlight shrink-0 text-sm text-debt"
-            >{{ formatOweAmount(entry.total) }}</span>
+            {{ actions.refreshLine }}
+          </button>
+          <button
+            type="button"
+            class="btn-secondary btn-sm flex-1"
+            (click)="copyRoast(debtor.memberId, debtor.amount)"
+          >
+            {{
+              copiedId === debtor.memberId ? actions.copied : actions.copyReminder
+            }}
           </button>
         </div>
-      </section>
-
-      <section class="card card-highlight-debt" *ngIf="vm.myDebtors.length > 0">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="card-title">{{ pages.whoShouldRepayYou }}</p>
-            <p class="helper-text mt-1">{{ pages.whoShouldRepayYouHint }}</p>
-          </div>
-          <button type="button" class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95" (click)="refreshDebtorCardQuotes()">🔄 換文案</button>
-        </div>
-        <div class="stack-sm mt-3">
-          <div *ngFor="let debtor of vm.myDebtors" class="inset-panel rank-row" [style.--rank-accent]="memberColorSolid(auth.getMember(debtor.memberId)?.color || '')">
-            <div class="flex items-center gap-3">
-              <ng-container *ngIf="auth.getMember(debtor.memberId) as member">
-                <app-member-avatar [member]="member" size="sm" />
-                <div class="min-w-0 flex-1">
-                  <p class="item-title">{{ member.name }}</p>
-                  <p class="caption-text mt-0.5">{{ debtorQuipLine(debtor.memberId, vm.memberId) }}</p>
-                </div>
-              </ng-container>
-              <span class="amount-highlight shrink-0 text-sm text-positive">{{ formatOwedAmount(debtor.amount) }}</span>
-            </div>
-            <p class="helper-text mt-2 rounded-xl bg-white/70 px-3 py-2 italic">「{{ roastPreview(debtor.memberId, debtor.amount) }}」</p>
-            <div class="mt-2 flex gap-2">
-              <button type="button" class="btn-secondary btn-sm flex-1" (click)="refreshDebtorQuote(debtor.memberId)">🔄 換一句</button>
-              <button type="button" class="btn-primary btn-sm flex-1" (click)="copyRoast(debtor.memberId, debtor.amount)">{{ copiedId === debtor.memberId ? '已複製 ✓' : '複製提醒' }}</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <app-settlement-sheet
-        [open]="sheetOpen"
-        [title]="sheetTitle"
-        [subtitle]="sheetSubtitle"
-        [mode]="sheetMode"
-        [subjectMemberId]="sheetSubjectId"
-        [settlementRows]="sheetSettlementRows"
-        [pair]="sheetPair"
-        [transactions]="sheetTransactions"
-        (closed)="closeSheet()"
-      />
-
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">{{ pages.recentRecords }}</h2>
-          <a
-            *ngIf="vm.latestEntries.length"
-            routerLink="/transactions"
-            class="text-link"
-          >
-            {{ actions.viewAll }}
-          </a>
-        </div>
-
-        <div *ngIf="vm.latestEntries.length" class="stack-sm">
-          <a
-            *ngFor="let entry of vm.latestEntries"
-            [routerLink]="['/transactions', entry.tx.id]"
-            class="card block"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <p class="item-title">{{ entry.tx.title }}</p>
-                  <span class="chip bg-cream text-xs">{{ typeLabel(entry.tx.type) }}</span>
-                </div>
-                <p class="helper-text mt-1">
-                  {{ entry.tx | transactionDate }}
-                  <ng-container *ngIf="entry.tx.type === 'advance'">· {{ pages.payment }}：{{ advancePayerNames(entry.tx) }}</ng-container>
-                  <ng-container *ngIf="entry.tx.type === 'repayment'">· {{ auth.getMember(entry.tx.fromMemberId ?? '')?.name }} → {{ auth.getMember(entry.tx.payerId)?.name }}</ng-container>
-                  <ng-container *ngIf="entry.tx.type === 'transfer'">· 整合了 {{ entry.tx.sourceTransactionIds?.length ?? 0 }} 筆記錄</ng-container>
-                </p>
-              </div>
-              <span
-                class="shrink-0"
-                [class.amount-lg]="entry.impact !== 0"
-                [class.amount-lg-neutral]="entry.impact === 0"
-                [class.text-debt]="entry.impact < 0"
-                [class.text-positive]="entry.impact > 0"
-              >
-                <ng-container *ngIf="entry.impact < 0">{{ formatOweAmount(-entry.impact) }}</ng-container>
-                <ng-container *ngIf="entry.impact > 0">+{{ formatOwedAmount(entry.impact) }}</ng-container>
-                <ng-container *ngIf="entry.impact === 0">NT$ {{ entry.tx.totalAmount }}</ng-container>
-              </span>
-            </div>
-            <app-member-net-chips
-              *ngIf="entry.memberNets.length > 0"
-              [rows]="entry.memberNets"
-            />
-          </a>
-        </div>
-
-        <div *ngIf="vm.latestEntries.length === 0" class="empty-state">
-          <app-kaomoji-deco mood="expense" seed="latest" />
-          <p class="empty-state__text">{{ empty.noRecords }}，歡迎{{ actions.addRecord }}</p>
-          <a routerLink="/transactions/new" class="btn-primary mt-4 inline-block">{{ actions.addRecord }}</a>
-        </div>
-      </section>
+      </div>
     </div>
-  
+
+    <p *ngIf="vm.myDebtors.length === 0" class="dashboard-section-empty">
+      {{ pages.remindEmpty }}
+    </p>
+  </section>
+
+  <app-settlement-sheet
+    [open]="sheetOpen"
+    [title]="sheetTitle"
+    [subtitle]="sheetSubtitle"
+    [mode]="sheetMode"
+    [subjectMemberId]="sheetSubjectId"
+    [settlementRows]="sheetSettlementRows"
+    [pair]="sheetPair"
+    [transactions]="sheetTransactions"
+    (closed)="closeSheet()"
+  />
+</div>

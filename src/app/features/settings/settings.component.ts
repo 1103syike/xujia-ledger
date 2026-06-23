@@ -17,9 +17,9 @@ import {
   normalizeThemePresetId,
   resolveAvatarChoice,
 } from '../../core/models';
-import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
-import { AvatarPickerComponent } from '../../shared/components/avatar-picker.component';
-import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
+import { AvatarPickerComponent } from '../../shared/components/branding/avatar-picker.component';
+import { ConfirmDialogComponent } from '../../shared/components/form/confirm-dialog.component';
 
 @Component({
   selector: 'app-settings',
@@ -77,6 +77,7 @@ export class SettingsComponent implements OnDestroy {
 
   selectTheme(id: ThemePresetId): void {
     this.themePresetId = id;
+    this.themeService.applyTheme(getThemePreset(id).colors);
   }
 
   onAvatarChoiceChange(choice: AvatarChoice): void {

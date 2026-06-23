@@ -1,0 +1,67 @@
+// ── Design System mixins ──
+
+@mixin text-secondary {
+  color: var(--color-text-secondary);
+}
+
+@mixin text-muted {
+  color: var(--color-text-muted);
+}
+
+@mixin text-hint {
+  color: var(--color-text-hint);
+}
+
+@mixin border-subtle($color: var(--theme-peach), $opacity: 20%) {
+  border: 1px solid color-mix(in srgb, #{$color} #{$opacity}, transparent);
+}
+
+@mixin border-input {
+  border: 1px solid var(--color-border-input);
+}
+
+@mixin focus-ring {
+  outline: 2px solid color-mix(in srgb, var(--color-focus) 55%, transparent);
+  outline-offset: 2px;
+}
+
+@mixin focus-border {
+  border-color: var(--color-brand-peach);
+}
+
+@mixin press-scale($scale: 0.95) {
+  transition: transform var(--duration-fast) var(--ease-default);
+
+  &:active {
+    transform: scale($scale);
+  }
+}
+
+@mixin surface-card {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--layout-card-padding);
+  box-shadow: var(--shadow-1);
+}
+
+@mixin surface-inset {
+  border-radius: var(--radius-md);
+  background: var(--color-surface-inset);
+  padding: var(--layout-inset-padding);
+}
+
+@mixin tabular-amount {
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin disabled-state {
+  opacity: 0.45;
+  pointer-events: none;
+}

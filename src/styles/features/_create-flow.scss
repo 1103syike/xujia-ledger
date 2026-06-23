@@ -1,0 +1,103 @@
+@import '../mixins';
+
+/* ── Create flow ── */
+
+.create-submit-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-submit-bar);
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  padding: var(--space-3) var(--layout-page-padding-x);
+  backdrop-filter: blur(12px);
+}
+
+.create-submit-bar__inner {
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  max-width: var(--layout-max-width);
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.create-submit-bar__hint {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.advance-sticky-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1) var(--space-2);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.advance-sticky-summary__sep {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-disabled);
+}
+
+.advance-sticky-summary__warn {
+  width: 100%;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-link);
+}
+
+.create-submit-bar .btn-primary:disabled {
+  @include disabled-state;
+  transform: none;
+}
+
+.create-success-screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--color-surface-overlay);
+  padding: var(--space-4);
+  backdrop-filter: blur(4px);
+}
+
+.create-success-card {
+  width: 100%;
+  max-width: var(--layout-max-width);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-2);
+}
+
+.create-success-card__icon {
+  text-align: center;
+  font-size: var(--font-size-2xl);
+}
+
+.create-success-impact {
+  margin-top: var(--space-4);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-bg) 75%, var(--color-surface));
+  @extend .stack-sm;
+}
+
+.create-success-impact__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  @extend .body-text;
+}

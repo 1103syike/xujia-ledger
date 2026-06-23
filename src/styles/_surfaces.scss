@@ -1,0 +1,138 @@
+@import './mixins';
+
+/* ── Surfaces ── */
+
+.card {
+  @include surface-card;
+}
+
+.card-stack {
+  @include surface-card;
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-section-gap);
+}
+
+.inset-panel {
+  @include surface-inset;
+}
+
+.rank-row {
+  border-left: var(--space-1) solid var(--rank-accent, var(--ds-peach));
+}
+
+.empty-state {
+  @include surface-card;
+  text-align: center;
+}
+
+.empty-state__icon {
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+}
+
+.empty-state__text {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  @include text-hint;
+}
+
+.card-highlight-rank {
+  background-color: color-mix(in srgb, var(--ds-peach) 14%, var(--color-bg));
+  @include border-subtle(var(--ds-peach), 24%);
+}
+
+.card-highlight-debt {
+  background-color: color-mix(in srgb, var(--ds-coral) 16%, var(--color-bg));
+  @include border-subtle(var(--ds-coral), 24%);
+}
+
+.logo-mark {
+  display: inline-flex;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-1);
+  @include border-subtle(var(--ds-peach), 25%);
+}
+
+.app-logo {
+  display: block;
+  flex-shrink: 0;
+}
+
+.deco-banner {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+  padding: var(--space-4) var(--space-3);
+  text-align: center;
+  box-shadow: var(--shadow-1);
+  @include border-subtle(var(--ds-peach), 20%);
+}
+
+.deco-banner--subtle {
+  background: transparent;
+  padding: var(--space-2) 0;
+  box-shadow: var(--shadow-0);
+  border: none;
+}
+
+.login-deco-layer {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-4) var(--space-6);
+  opacity: 0.4;
+}
+
+.kaomoji-deco {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+
+.kaomoji-deco--sm {
+  font-size: var(--font-size-xl);
+}
+
+.deco-illustration {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.deco-illustration--logo {
+  height: 5rem;
+  width: 5rem;
+}
+
+.deco-illustration--group {
+  width: 100%;
+  max-width: 20rem;
+}
+
+.deco-illustration--empty {
+  height: 9rem;
+  width: 9rem;
+}
+
+.deco-illustration--celebrate {
+  height: 8rem;
+  width: 8rem;
+}
+
+.deco-illustration--stickers {
+  width: 100%;
+  max-width: 14rem;
+  opacity: 0.8;
+}

@@ -4,8 +4,8 @@ import { RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
-import { formatAuditLog } from '../../core/utils/audit-formatter';
-import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
+import { formatAuditLog } from '../../core/display/audit-formatter';
+import { KaomojiDecoComponent } from '../../shared/components/branding/kaomoji-deco.component';
 import { COPY_ACTIONS, COPY_EMPTY, COPY_PAGES } from '../../copy';
 
 @Component({

@@ -24,21 +24,21 @@ export const routes: Routes = [
       {
         path: 'transactions',
         loadComponent: () =>
-          import('./features/transactions/transaction-list.component').then(
+          import('./features/transactions/list/transaction-list.component').then(
             (m) => m.TransactionListComponent
           ),
       },
       {
         path: 'transactions/new',
         loadComponent: () =>
-          import('./features/transactions/transaction-create.component').then(
+          import('./features/transactions/create/transaction-create.component').then(
             (m) => m.TransactionCreateComponent
           ),
       },
       {
         path: 'transactions/:id/edit',
         loadComponent: () =>
-          import('./features/transactions/transaction-create.component').then(
+          import('./features/transactions/create/transaction-create.component').then(
             (m) => m.TransactionCreateComponent
           ),
         data: { edit: true },
@@ -46,7 +46,7 @@ export const routes: Routes = [
       {
         path: 'transactions/:id',
         loadComponent: () =>
-          import('./features/transactions/transaction-detail.component').then(
+          import('./features/transactions/detail/transaction-detail.component').then(
             (m) => m.TransactionDetailComponent
           ),
       },

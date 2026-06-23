@@ -1,0 +1,23 @@
+/* ── Audit ── */
+
+.audit-diff-line {
+  font-weight: var(--font-weight-medium);
+  color: color-mix(in srgb, var(--ds-coral) 75%, var(--color-text));
+}
+
+.audit-card__link {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-link);
+}
+
+/* ── Sheet animation ── */
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

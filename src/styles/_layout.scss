@@ -1,0 +1,71 @@
+@import './mixins';
+
+/* ── Layout patterns ── */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-page-gap);
+  padding-bottom: var(--space-8);
+}
+
+.page-title-bar {
+  display: flex;
+  min-height: var(--layout-header-min-height);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.page-title-bar .page-title {
+  min-width: 0;
+  @include truncate;
+}
+
+.page-title-bar__aside {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.page-header {
+  @extend .page-title-bar;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-section-gap);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stack-md {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-card-gap);
+}

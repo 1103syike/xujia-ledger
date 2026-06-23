@@ -4,11 +4,14 @@ import { RouterLink } from '@angular/router';
 import { combineLatest, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TransactionService } from '../../core/services/transaction.service';
-import { netBalances, settlementsForMember, signedImpactOnMember } from '../../core/utils/ledger-calculator';
+import {
+  settlementsForMember,
+  signedImpactOnMember,
+} from '../../core/ledger/ledger-calculator';
 import {
   formatOweAmount,
   formatOwedAmount,
-} from '../../core/utils/settlement-display';
+} from '../../core/ledger/settlement-display';
 import {
   allClearQuip,
   buildRoastMessage,
@@ -16,37 +19,39 @@ import {
   debtorsToCreditor,
   rankQuip,
   rankTitle,
-  quoteCounts,
   totalDebtRanking,
-} from '../../core/utils/dashboard-insights';
-import { activeTransactions, transactionTypeLabel } from '../../core/utils/transaction-date';
-import { formatAdvancePayerNames } from '../../core/utils/advance-display';
-import { memberNetRowsForTransaction } from '../../core/utils/transaction-member-nets';
-import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
-import { MemberNetChipsComponent } from '../../shared/components/member-net-chips.component';
+} from '../../core/display/dashboard-insights';
+import { activeTransactions } from '../../core/transactions/transaction-date';
+import { formatAdvancePayerNames } from '../../core/transactions/advance-display';
+import { formatViewerImpact } from '../../core/transactions/transaction-impact';
+import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
-import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
-import {
-  memberColorBorder,
-  memberColorSoftBg,
-  memberColorSolid,
-} from '../../core/utils/member-color';
+import { KaomojiDecoComponent } from '../../shared/components/branding/kaomoji-deco.component';
+import { memberColorSolid } from '../../core/display/member-color';
 import { SettlementEntry, Transaction } from '../../core/models';
 import {
   PairSettlementView,
   SettlementPairRow,
   SettlementSheetComponent,
-} from '../../shared/components/settlement-sheet.component';
+} from '../../shared/components/ledger/settlement-sheet.component';
 import {
   COPY_ACTIONS,
   COPY_EMPTY,
   COPY_PAGES,
+  COPY_TERMS,
 } from '../../copy';
 
 interface LatestEntry {
   tx: Transaction;
   impact: number;
-  memberNets: ReturnType<typeof memberNetRowsForTransaction>;
+}
+
+interface DashboardHero {
+  totalOwe: number;
+  totalOwed: number;
+  netBalance: number;
+  isClear: boolean;
+  primaryOwe: SettlementEntry | null;
 }
 
 @Component({
@@ -59,27 +64,23 @@ interface LatestEntry {
     TransactionDatePipe,
     KaomojiDecoComponent,
     SettlementSheetComponent,
-    MemberNetChipsComponent,
   ],
   templateUrl: './dashboard.component.html',
-
 })
 export class DashboardComponent {
   actions = COPY_ACTIONS;
   pages = COPY_PAGES;
+  terms = COPY_TERMS;
   empty = COPY_EMPTY;
   formatOweAmount = formatOweAmount;
   formatOwedAmount = formatOwedAmount;
   rankTitle = rankTitle;
-  quoteCounts = quoteCounts();
-  typeLabel = transactionTypeLabel;
+  formatViewerImpact = formatViewerImpact;
   memberColorSolid = memberColorSolid;
-  memberColorSoftBg = memberColorSoftBg;
-  memberColorBorder = memberColorBorder;
   copiedId: string | null = null;
   rankSalt = 0;
-  debtorCardSalt = 0;
   clearSalt = 0;
+  debtorCardSalt = 0;
   debtorSalts: Record<string, number> = {};
   sheetOpen = false;
   sheetMode: 'debt-breakdown' | 'pair' = 'debt-breakdown';
@@ -98,20 +99,34 @@ export class DashboardComponent {
       const active = activeTransactions(transactions);
       const memberId = member?.id ?? '';
 
-      const latestEntries: LatestEntry[] = active
-        .slice(0, 3)
-        .map((tx) => ({
-          tx,
-          impact: memberId ? signedImpactOnMember(tx, memberId) : 0,
-          memberNets: memberNetRowsForTransaction(tx),
-        }));
+      const mySettlements = memberId
+        ? settlementsForMember(active, memberId)
+        : [];
+      const totalOwe = mySettlements
+        .filter((s) => s.direction === 'owe')
+        .reduce((sum, s) => sum + s.amount, 0);
+      const totalOwed = mySettlements
+        .filter((s) => s.direction === 'owed')
+        .reduce((sum, s) => sum + s.amount, 0);
+      const hero: DashboardHero = {
+        totalOwe,
+        totalOwed,
+        netBalance: totalOwed - totalOwe,
+        isClear: mySettlements.length === 0,
+        primaryOwe: mySettlements.find((s) => s.direction === 'owe') ?? null,
+      };
+
+      const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => ({
+        tx,
+        impact: memberId ? signedImpactOnMember(tx, memberId) : 0,
+      }));
 
       return {
         memberId,
         activeTransactions: active,
-        balances: netBalances(active),
-        mySettlements: memberId ? settlementsForMember(active, memberId) : [],
-        debtRanking: totalDebtRanking(active),
+        hero,
+        mySettlements,
+        debtRanking: totalDebtRanking(active).slice(0, 3),
         myDebtors: memberId ? debtorsToCreditor(active, memberId) : [],
         latestEntries,
       };
@@ -127,6 +142,10 @@ export class DashboardComponent {
     return ['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`;
   }
 
+  rankQuipLine(memberId: string, index: number): string {
+    return rankQuip(memberId, index, this.rankSalt);
+  }
+
   refreshRankQuotes(): void {
     this.rankSalt++;
   }
@@ -140,11 +159,58 @@ export class DashboardComponent {
   }
 
   refreshDebtorQuote(debtorId: string): void {
-    this.debtorSalts = { ...this.debtorSalts, [debtorId]: (this.debtorSalts[debtorId] ?? 0) + 1 };
+    this.debtorSalts = {
+      ...this.debtorSalts,
+      [debtorId]: (this.debtorSalts[debtorId] ?? 0) + 1,
+    };
   }
 
-  rankQuipLine(memberId: string, index: number): string {
-    return rankQuip(memberId, index, this.rankSalt);
+  clearQuipLine(memberId: string): string {
+    if (!memberId) {
+      return `${this.pages.noPendingSettlement}，${this.pages.ledgerHealthy}。`;
+    }
+    return allClearQuip(memberId, this.clearSalt);
+  }
+
+  debtorQuipLine(debtorId: string, creditorId: string): string {
+    return debtorCardQuip(debtorId, creditorId, this.debtorCardSalt);
+  }
+
+  latestMeta(tx: Transaction): string {
+    if (tx.type === 'advance') {
+      return `${this.pages.payment}：${this.advancePayerNames(tx)}`;
+    }
+    if (tx.type === 'repayment') {
+      const from = this.auth.getMember(tx.fromMemberId ?? '')?.name ?? '';
+      const to = this.auth.getMember(tx.payerId)?.name ?? '';
+      return `${from} → ${to}`;
+    }
+    const n = tx.sourceTransactionIds?.length ?? 0;
+    return `整合了 ${n} 筆`;
+  }
+
+  advancePayerNames(tx: Transaction): string {
+    return formatAdvancePayerNames(tx, (id) => this.auth.getMember(id)?.name ?? id);
+  }
+
+  roastPreview(debtorId: string, amount: number): string {
+    const creditorId = this.auth.currentMember?.id ?? '';
+    const name = this.auth.getMember(debtorId)?.name ?? '你';
+    const salt = this.debtorSalts[debtorId] ?? 0;
+    return buildRoastMessage(name, amount, debtorId, creditorId, salt);
+  }
+
+  async copyRoast(debtorId: string, amount: number): Promise<void> {
+    const text = this.roastPreview(debtorId, amount);
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copiedId = debtorId;
+      setTimeout(() => {
+        if (this.copiedId === debtorId) this.copiedId = null;
+      }, 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
   }
 
   openPairSettlement(
@@ -193,38 +259,5 @@ export class DashboardComponent {
 
   closeSheet(): void {
     this.sheetOpen = false;
-  }
-
-  debtorQuipLine(debtorId: string, creditorId: string): string {
-    return debtorCardQuip(debtorId, creditorId, this.debtorCardSalt);
-  }
-
-  clearQuipLine(memberId: string): string {
-    if (!memberId) return `${this.pages.noPendingSettlement}，${this.pages.ledgerHealthy}。`;
-    return allClearQuip(memberId, this.clearSalt);
-  }
-
-  advancePayerNames(tx: import('../../core/models').Transaction): string {
-    return formatAdvancePayerNames(tx, (id) => this.auth.getMember(id)?.name ?? id);
-  }
-
-  roastPreview(debtorId: string, amount: number): string {
-    const creditorId = this.auth.currentMember?.id ?? '';
-    const name = this.auth.getMember(debtorId)?.name ?? '你';
-    const salt = this.debtorSalts[debtorId] ?? 0;
-    return buildRoastMessage(name, amount, debtorId, creditorId, salt);
-  }
-
-  async copyRoast(debtorId: string, amount: number): Promise<void> {
-    const text = this.roastPreview(debtorId, amount);
-    try {
-      await navigator.clipboard.writeText(text);
-      this.copiedId = debtorId;
-      setTimeout(() => {
-        if (this.copiedId === debtorId) this.copiedId = null;
-      }, 2000);
-    } catch {
-      /* clipboard unavailable */
-    }
   }
 }

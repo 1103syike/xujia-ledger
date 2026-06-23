@@ -11,12 +11,12 @@ import {
   loadLoginPrefs,
   recordSuccessfulLogin,
   sortMembersByRecency,
-} from '../../core/utils/login-prefs';
-import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
-import { KaomojiLoadingComponent } from '../../shared/components/kaomoji-loading.component';
-import { DecoIllustrationComponent } from '../../shared/components/deco-illustration.component';
-import { AppLogoComponent } from '../../shared/components/app-logo.component';
-import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
+} from '../../core/infra/login-prefs';
+import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
+import { KaomojiLoadingComponent } from '../../shared/components/branding/kaomoji-loading.component';
+import { DecoIllustrationComponent } from '../../shared/components/branding/deco-illustration.component';
+import { AppLogoComponent } from '../../shared/components/branding/app-logo.component';
+import { KaomojiDecoComponent } from '../../shared/components/branding/kaomoji-deco.component';
 
 @Component({
   selector: 'app-login',

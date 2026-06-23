@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { displayNameOf } from '../core/models';
-import { MemberAvatarComponent } from '../shared/components/member-avatar.component';
-import { AppLogoComponent } from '../shared/components/app-logo.component';
+import { MemberAvatarComponent } from '../shared/components/member/member-avatar.component';
+import { AppLogoComponent } from '../shared/components/branding/app-logo.component';
 import { COPY_NAV } from '../copy';
 
 @Component({

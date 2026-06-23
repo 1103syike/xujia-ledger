@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { BehaviorSubject, filter, firstValueFrom, take } from 'rxjs';
-import { firebaseAuth, firestoreDb } from '../firebase';
+import { firebaseAuth, firestoreDb } from '../config/firebase';
 import {
   DEFAULT_MEMBERS,
   DisplayMember,

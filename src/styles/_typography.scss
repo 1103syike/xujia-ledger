@@ -1,0 +1,106 @@
+@import './mixins';
+
+/* ── Typography scale ── */
+
+.page-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+.section-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text);
+}
+
+.card-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text);
+}
+
+.item-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text);
+}
+
+.field-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+
+.helper-text {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  @include text-hint;
+}
+
+.body-text {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text);
+}
+
+.caption-text {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  @include text-muted;
+}
+
+.amount-md {
+  font-size: var(--font-size-base);
+  @include tabular-amount;
+  color: var(--color-text);
+}
+
+.amount-lg {
+  font-size: var(--font-size-lg);
+  @include tabular-amount;
+  color: var(--color-text);
+}
+
+.amount-neutral {
+  font-size: var(--font-size-base);
+  @include tabular-amount;
+  color: color-mix(in srgb, var(--color-text) 36%, var(--ds-lavender));
+}
+
+.amount-lg-neutral {
+  font-size: var(--font-size-lg);
+  @include tabular-amount;
+  color: color-mix(in srgb, var(--color-text) 36%, var(--ds-lavender));
+}
+
+.amount-highlight {
+  font-size: var(--font-size-base);
+  @include tabular-amount;
+  color: color-mix(in srgb, var(--ds-coral) 72%, var(--color-text));
+}
+
+.text-link {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-link);
+}
+
+.back-link {
+  display: inline-block;
+  font-size: var(--font-size-sm);
+  @include text-hint;
+}
+
+.sheet-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text);
+}

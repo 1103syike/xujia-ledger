@@ -1,0 +1,73 @@
+/* ── Semantic color utilities (Tailwind 補充) ── */
+
+.bg-cream {
+  background-color: var(--color-bg);
+}
+
+.bg-peach {
+  background-color: var(--color-brand-peach);
+}
+
+.bg-mint {
+  background-color: var(--color-brand-mint);
+}
+
+.bg-lavender {
+  background-color: var(--color-brand-lavender);
+}
+
+.bg-coral {
+  background-color: var(--color-brand-coral);
+}
+
+.text-coral {
+  color: var(--color-link);
+}
+
+.text-debt {
+  color: var(--color-debt);
+}
+
+.text-mint {
+  color: var(--color-brand-mint);
+}
+
+.text-positive {
+  color: var(--color-positive);
+}
+
+.text-ink {
+  color: var(--color-text);
+}
+
+.border-peach\/30 {
+  border-color: var(--color-border-input);
+}
+
+.border-peach {
+  border-color: var(--color-brand-peach);
+}
+
+.border-peach\/20 {
+  border-color: var(--color-border);
+}
+
+.ring-peach\/40 {
+  --tw-ring-color: color-mix(in srgb, var(--ds-peach) 40%, transparent);
+}
+
+.bg-peach\/10 {
+  background-color: color-mix(in srgb, var(--ds-peach) 10%, transparent);
+}
+
+.bg-peach\/15 {
+  background-color: color-mix(in srgb, var(--ds-peach) 15%, transparent);
+}
+
+.bg-lavender\/30 {
+  background-color: color-mix(in srgb, var(--ds-lavender) 30%, transparent);
+}
+
+.bg-coral\/20 {
+  background-color: color-mix(in srgb, var(--ds-coral) 20%, transparent);
+}

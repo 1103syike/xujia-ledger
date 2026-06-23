@@ -8,13 +8,13 @@ import {
   pairwiseSettlement,
   signedImpactOnMember,
   transactionsBetweenMembers,
-} from '../../core/utils/ledger-calculator';
+} from '../../core/ledger/ledger-calculator';
 import {
   formatOweAmount,
   formatOwedAmount,
-} from '../../core/utils/settlement-display';
-import { activeTransactions, transactionTypeLabel } from '../../core/utils/transaction-date';
-import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+} from '../../core/ledger/settlement-display';
+import { activeTransactions, transactionTypeLabel } from '../../core/transactions/transaction-date';
+import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
 import { COPY_ACTIONS, COPY_NAV, COPY_PAGES } from '../../copy';
 

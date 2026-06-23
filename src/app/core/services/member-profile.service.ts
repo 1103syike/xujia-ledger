@@ -10,7 +10,7 @@ import {
   UpdateData,
 } from 'firebase/firestore';
 import { BehaviorSubject } from 'rxjs';
-import { firestoreDb } from '../firebase';
+import { firestoreDb } from '../config/firebase';
 import {
   DEFAULT_MEMBERS,
   DEFAULT_THEME_PRESET_ID,
