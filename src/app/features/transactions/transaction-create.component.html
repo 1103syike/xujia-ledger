@@ -1,0 +1,417 @@
+    <div class="page">
+      <a
+        [routerLink]="isEditMode && editTransactionId ? ['/transactions', editTransactionId] : '/transactions'"
+        class="back-link"
+      >← 返回</a>
+
+      <div class="page-title-bar">
+        <h2 class="page-title">{{ isEditMode ? actions.editRecord : actions.addRecord }}</h2>
+      </div>
+
+      <div *ngIf="!isEditMode" class="card-stack mb-4">
+        <p class="card-title">{{ pages.recordType }}</p>
+        <div class="flex gap-2">
+          <button type="button" class="mode-chip flex-1" [class.bg-mint]="mode === 'advance'" [class.text-ink]="mode === 'advance'" [class.bg-cream]="mode !== 'advance'" (click)="setMode('advance')">{{ recordType.splitBill }}</button>
+          <button type="button" class="mode-chip flex-1" [class.bg-lavender]="mode === 'repayment'" [class.text-ink]="mode === 'repayment'" [class.bg-cream]="mode !== 'repayment'" (click)="setMode('repayment')">{{ recordType.repayment }}</button>
+          <button type="button" class="mode-chip flex-1" [class.bg-coral]="mode === 'transfer'" [class.text-white]="mode === 'transfer'" [class.bg-cream]="mode !== 'transfer'" [class.text-ink]="mode !== 'transfer'" (click)="setMode('transfer')">{{ recordType.consolidate }}</button>
+        </div>
+      </div>
+
+      <form *ngIf="mode === 'advance'" [formGroup]="advanceForm" (ngSubmit)="submitAdvance()" class="stack-lg pb-40">
+        <!-- ① 發生什麼事 -->
+        <div class="card-stack">
+          <p class="card-title">發生什麼事</p>
+          <div class="field-group">
+            <label class="field-label">項目</label>
+            <input formControlName="title" class="input" placeholder="例：火鍋、電影、慕斯瓶" />
+          </div>
+          <app-date-field formControlName="date" />
+          <div class="field-group">
+            <label class="field-label">備註（選填）</label>
+            <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
+          </div>
+        </div>
+
+        <!-- ② 怎麼分 -->
+        <div class="card-stack">
+          <p class="card-title">怎麼分</p>
+          <p class="helper-text mb-2">這筆消費怎麼算在大家身上</p>
+          <div class="flex gap-2">
+            <button type="button" class="mode-chip flex-1" [class.bg-mint]="splitRule === 'equal'" [class.text-ink]="splitRule === 'equal'" [class.bg-cream]="splitRule !== 'equal'" (click)="setSplitRule('equal')">大家均分</button>
+            <button type="button" class="mode-chip flex-1" [class.bg-lavender]="splitRule === 'custom'" [class.text-ink]="splitRule === 'custom'" [class.bg-cream]="splitRule !== 'custom'" (click)="setSplitRule('custom')">每人不一樣</button>
+          </div>
+
+          <ng-container *ngIf="splitRule === 'equal'">
+            <div class="field-group mt-3">
+              <label class="field-label">消費總額</label>
+              <input formControlName="totalAmount" type="number" inputmode="numeric" class="input input-amount" placeholder="0" />
+            </div>
+
+            <div class="stack-sm">
+              <label
+                *ngFor="let m of members"
+                class="equal-split-row"
+                [class.equal-split-row--off]="isSkipped(m.id)"
+              >
+                <input
+                  type="checkbox"
+                  class="equal-split-row__checkbox"
+                  [checked]="!isSkipped(m.id)"
+                  (change)="toggleSkip(m.id)"
+                />
+                <app-member-avatar [member]="m" size="sm" />
+                <span class="body-text">{{ m.name }}</span>
+                <span *ngIf="!isSkipped(m.id) && previewAmountFor(m.id) > 0" class="equal-split-row__amount">
+                  NT$ {{ previewAmountFor(m.id) }}
+                </span>
+                <span *ngIf="isSkipped(m.id)" class="equal-split-row__amount caption-text">沒參與</span>
+              </label>
+            </div>
+
+            <p *ngIf="equalPerPersonLabel" class="equal-split-summary">{{ equalPerPersonLabel }}</p>
+          </ng-container>
+
+          <ng-container *ngIf="splitRule === 'custom'">
+            <div class="mt-3 flex gap-2">
+              <button type="button" class="mode-chip flex-1 text-sm" [class.bg-lavender]="customInputMethod === 'lineItems'" [class.text-ink]="customInputMethod === 'lineItems'" [class.bg-cream]="customInputMethod !== 'lineItems'" (click)="setCustomInputMethod('lineItems')">逐項記帳</button>
+              <button type="button" class="mode-chip flex-1 text-sm" [class.bg-lavender]="customInputMethod === 'direct'" [class.text-ink]="customInputMethod === 'direct'" [class.bg-cream]="customInputMethod !== 'direct'" (click)="setCustomInputMethod('direct')">直接填金額</button>
+            </div>
+
+            <ng-container *ngIf="customInputMethod === 'direct'">
+              <div class="stack-sm mt-3">
+                <div
+                  *ngFor="let m of members"
+                  class="equal-split-row"
+                  [class.equal-split-row--off]="isSkipped(m.id)"
+                >
+                  <app-member-avatar [member]="m" size="sm" />
+                  <span class="body-text min-w-0 flex-1">{{ m.name }}</span>
+                  <ng-container *ngIf="!isSkipped(m.id)">
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      class="input-sm input-amount w-24 text-right"
+                      [ngModel]="manualAmounts[m.id] || ''"
+                      [ngModelOptions]="{ standalone: true }"
+                      placeholder="0"
+                      (ngModelChange)="setDirectAmount(m.id, $event)"
+                    />
+                  </ng-container>
+                  <button
+                    type="button"
+                    class="chip text-xs shrink-0"
+                    [class.bg-lavender]="isSkipped(m.id)"
+                    [class.bg-cream]="!isSkipped(m.id)"
+                    (click)="toggleSkip(m.id)"
+                  >
+                    {{ isSkipped(m.id) ? '有參與' : '沒參與' }}
+                  </button>
+                </div>
+              </div>
+            </ng-container>
+
+            <ng-container *ngIf="customInputMethod === 'lineItems'">
+              <div class="field-group mt-3">
+                <label class="field-label">帳單總額（選填）</label>
+                <input formControlName="billTotal" type="number" inputmode="numeric" class="input input-amount" placeholder="高於已分攤時，圓餅圖顯示未分配餘額" />
+              </div>
+
+              <div class="stack-sm">
+                <div
+                  *ngFor="let m of members"
+                  class="itemized-member-card"
+                  [class.itemized-member-card--skipped]="isSkipped(m.id)"
+                >
+                  <div class="itemized-member-card__head">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <app-member-avatar [member]="m" size="sm" />
+                      <span class="item-title">{{ m.name }}</span>
+                    </div>
+                    <div class="itemized-member-card__allocated">
+                      <span class="itemized-member-card__allocated-label">應付</span>
+                      <span class="itemized-member-card__allocated-value">
+                        <ng-container *ngIf="isSkipped(m.id)">沒參與</ng-container>
+                        <ng-container *ngIf="!isSkipped(m.id)">NT$ {{ memberSubtotals[m.id] || 0 }}</ng-container>
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="chip mt-2"
+                    [class.bg-lavender]="isSkipped(m.id)"
+                    [class.bg-cream]="!isSkipped(m.id)"
+                    (click)="toggleSkip(m.id)"
+                  >
+                    {{ isSkipped(m.id) ? '有參與' : '沒參與' }}
+                  </button>
+
+                  <ng-container *ngIf="!isSkipped(m.id)">
+                    <div *ngIf="(memberItems[m.id] ?? []).length > 0" class="itemized-member-card__items">
+                      <div
+                        *ngFor="let item of memberItems[m.id] ?? []; let i = index"
+                        class="itemized-member-card__item-row"
+                      >
+                        <span class="min-w-0 flex-1 truncate">{{ item.note }}</span>
+                        <span class="shrink-0 font-medium">NT$ {{ item.amount }}</span>
+                        <button type="button" class="caption-text shrink-0 text-coral" (click)="removeMemberItem(m.id, i)">移除</button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="itemized-member-card__add-btn"
+                      (click)="toggleAddItem(m.id)"
+                    >
+                      {{ addingItemFor === m.id ? '收起' : '＋ 新增項目' }}
+                    </button>
+
+                    <div *ngIf="addingItemFor === m.id" class="itemized-member-card__add-form">
+                      <input
+                        class="input-sm min-w-0 flex-1"
+                        [(ngModel)]="memberDrafts[m.id].note"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="項目名稱"
+                      />
+                      <input
+                        type="number"
+                        inputmode="numeric"
+                        class="input-sm input-amount w-20 shrink-0 text-right"
+                        [(ngModel)]="memberDrafts[m.id].amount"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="金額"
+                        (keydown.enter)="addMemberItem(m.id); $event.preventDefault()"
+                      />
+                      <button type="button" class="btn-primary btn-sm shrink-0" (click)="addMemberItem(m.id)">加入</button>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </ng-container>
+          </ng-container>
+        </div>
+
+        <div *ngIf="preview && effectiveTotal > 0" class="card-stack">
+          <p class="card-title">{{ pages.splitResult }}</p>
+          <app-split-pie-chart [slices]="previewSlices" [totalAmount]="effectiveTotal" [billTotal]="chartBillTotal" />
+        </div>
+
+        <!-- ③ 誰付款 -->
+        <div class="card-stack">
+          <p class="card-title">誰付款</p>
+          <p class="helper-text mb-2">誰先掏錢（可多人，可找零）</p>
+          <div class="mb-2 flex items-center justify-end gap-2">
+            <button
+              *ngIf="payerRows.length === 1"
+              type="button"
+              class="btn-secondary btn-sm"
+              (click)="addPayer()"
+            >
+              ＋ 多人付款
+            </button>
+          </div>
+
+          <ng-container *ngIf="payerRows.length === 1">
+            <app-member-select-grid
+              label="付款人"
+              [members]="members"
+              [value]="payerRows[0].memberId"
+              (valueChange)="selectPrimaryPayer($event)"
+            />
+            <div class="payer-amount-row">
+              <div class="field-group min-w-0 flex-1">
+                <label class="field-label">實付金額</label>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  class="input input-amount"
+                  [ngModel]="payerRows[0].amount"
+                  [ngModelOptions]="{ standalone: true }"
+                  placeholder="0"
+                  (ngModelChange)="setPayerAmount(0, $event)"
+                />
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="payerRows.length > 1">
+            <div *ngFor="let row of payerRows; let i = index" class="mb-3">
+              <app-member-select-grid
+                [label]="'付款人 ' + (i + 1)"
+                [members]="members"
+                [value]="row.memberId"
+                [disabledIds]="disabledPayerIdsForRow(i)"
+                (valueChange)="setPayerMember(i, $event)"
+              />
+              <div class="payer-amount-row">
+                <div class="field-group min-w-0 flex-1">
+                  <label class="field-label">實付金額</label>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    class="input input-amount"
+                    [ngModel]="row.amount"
+                    [ngModelOptions]="{ standalone: true }"
+                    placeholder="0"
+                    (ngModelChange)="setPayerAmount(i, $event)"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="caption-text mb-2 shrink-0 text-coral"
+                  (click)="removePayer(i)"
+                >
+                  移除
+                </button>
+              </div>
+            </div>
+            <button type="button" class="btn-secondary btn-sm w-full" (click)="addPayer()">＋ 新增付款人</button>
+          </ng-container>
+        </div>
+
+        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
+
+        <div class="create-submit-bar">
+          <div class="create-submit-bar__inner">
+            <div *ngIf="effectiveTotal > 0 || payerTotal > 0" class="advance-sticky-summary">
+              <span>分攤 NT$ {{ stickySummary.splitTotal }}</span>
+              <span class="advance-sticky-summary__sep">·</span>
+              <span>實付 NT$ {{ stickySummary.grossPaid }}</span>
+              <span *ngIf="stickySummary.change > 0" class="advance-sticky-summary__sep">·</span>
+              <span *ngIf="stickySummary.change > 0" class="text-positive">找零 NT$ {{ stickySummary.change }}</span>
+              <span *ngIf="stickySummary.paymentShortfall > 0" class="advance-sticky-summary__warn">
+                實付少 NT$ {{ stickySummary.paymentShortfall }}
+              </span>
+            </div>
+            <p *ngIf="advanceSubmitHint" class="create-submit-bar__hint">{{ advanceSubmitHint }}</p>
+            <button
+              type="submit"
+              class="btn-primary w-full"
+              [disabled]="!canSubmitAdvance || submitBusy"
+            >
+              {{ isEditMode ? actions.save : actions.addRecord }}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div *ngIf="successOpen" class="create-success-screen" role="dialog" aria-labelledby="success-title">
+        <div class="create-success-card">
+          <p id="success-title" class="create-success-card__icon" aria-hidden="true">✅</p>
+          <h3 class="section-title text-center">建立成功</h3>
+          <p class="helper-text mt-1 text-center">{{ successTitle }} · NT$ {{ successAmount }}</p>
+
+          <div *ngIf="successImpactLines.length > 0" class="create-success-impact">
+            <p class="card-title mb-0">本次交易影響</p>
+            <div *ngFor="let line of successImpactLines" class="create-success-impact__row">
+              <span>{{ line.fromName }} 欠 {{ line.toName }}</span>
+              <span class="font-bold text-debt">{{ formatOwe(line.amount) }}</span>
+            </div>
+          </div>
+          <p *ngIf="successImpactLines.length === 0" class="helper-text mt-3 text-center">
+            {{ empty.noImpact }}
+          </p>
+
+          <div class="mt-4 flex gap-2">
+            <button type="button" class="btn-secondary flex-1" (click)="goToTransactions()">查看紀錄</button>
+            <button type="button" class="btn-primary flex-1" (click)="createAnother()">再建一筆</button>
+          </div>
+        </div>
+      </div>
+
+      <form *ngIf="mode === 'repayment'" [formGroup]="repaymentForm" (ngSubmit)="submitRepayment()" class="stack-lg pb-28">
+        <div class="card-stack">
+          <app-date-field formControlName="date" />
+
+          <ng-container *ngIf="hasRepaymentCreditors; else noRepaymentCreditors">
+            <app-member-picker
+              label="還款對象"
+              [members]="repaymentTargets"
+              [oweAmounts]="repaymentOweAmounts"
+              [value]="repaymentForm.value.toMemberId"
+              (valueChange)="setRepaymentTarget($event)"
+            />
+            <div class="field-group">
+              <label class="field-label">還款金額</label>
+              <div class="flex gap-2">
+                <input formControlName="amount" type="number" inputmode="numeric" class="input input-amount flex-1" placeholder="0" />
+                <button type="button" class="btn-secondary btn-sm shrink-0" [disabled]="!repaymentBalance || repaymentBalance <= 0" (click)="fillFullRepayment()">全部還清</button>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">備註（選填）</label>
+              <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
+            </div>
+          </ng-container>
+
+          <ng-template #noRepaymentCreditors>
+            <div class="empty-state py-6">
+              <app-kaomoji-deco mood="celebrate" seed="no-repay" [salt]="noRepaySalt" />
+              <p class="empty-state__text">{{ empty.noPendingRepayment }}</p>
+              <p class="helper-text mt-1">{{ empty.ledgerClear }}</p>
+              <button type="button" class="caption-text mt-2 rounded-full bg-cream px-3 py-1 active:scale-95" (click)="noRepaySalt = noRepaySalt + 1">🔄 換顏文字</button>
+            </div>
+          </ng-template>
+        </div>
+        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
+        <button type="submit" class="btn-primary w-full" [disabled]="!hasRepaymentCreditors">{{ actions.addRepayment }}</button>
+      </form>
+
+      <form *ngIf="mode === 'transfer'" [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="stack-lg pb-28">
+        <div class="card-stack">
+          <app-date-field formControlName="date" />
+          <div class="field-group">
+            <label class="field-label">備註（選填）</label>
+            <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
+          </div>
+        </div>
+
+        <div class="card-stack">
+          <p class="card-title">{{ pages.selectedRecords(selectedSourceTx.length) }}</p>
+          <p *ngIf="selectedSourceTx.length === 0" class="helper-text">
+            請至
+            <a routerLink="/transactions" [queryParams]="{ consolidate: '1' }" class="text-coral underline" (click)="$event.stopPropagation()">{{ nav.ledger }}</a>
+            勾選要整合的分帳，或點選下方按鈕
+          </p>
+          <a
+            *ngIf="selectedSourceTx.length === 0"
+            routerLink="/transactions"
+            [queryParams]="{ consolidate: '1' }"
+            class="btn-secondary btn-sm inline-block"
+          >
+            {{ actions.goLedgerSelect }}
+          </a>
+          <div *ngIf="selectedSourceTx.length > 0" class="stack-sm">
+            <div *ngFor="let tx of selectedSourceTx" class="inset-panel flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="item-title text-sm">{{ tx.title }}</p>
+                <p class="caption-text">NT$ {{ tx.totalAmount }}</p>
+              </div>
+              <button type="button" class="caption-text text-coral" (click)="removeSource(tx.id)">移除</button>
+            </div>
+          </div>
+        </div>
+
+        <app-transfer-breakdown
+          *ngIf="transferPreview?.hasDebts"
+          [edges]="transferEdges"
+          [memberRows]="transferMemberRows"
+        />
+
+        <p *ngIf="selectedSourceTx.length > 0 && !transferPreview?.hasDebts" class="helper-text text-center">
+          {{ empty.noConsolidationDebt }}
+        </p>
+
+        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
+        <button
+          type="submit"
+          class="btn-primary w-full"
+          [disabled]="!transferPreview?.hasDebts"
+        >
+          {{ actions.consolidate }}
+        </button>
+      </form>
+
+      <app-confirm-dialog [open]="submitDialogOpen" [title]="submitDialogTitle" [detail]="submitDialogDetail" [message]="submitDialogMessage" [confirmLabel]="isEditMode ? dialogs.confirmSave : dialogs.confirmAdd" [cancelLabel]="actions.cancel" [busy]="submitBusy" (confirmed)="confirmSubmit()" (cancelled)="closeSubmitDialog()" />
+    </div>
+  

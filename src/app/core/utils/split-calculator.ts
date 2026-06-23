@@ -4,6 +4,7 @@ import {
   Member,
   TransactionParticipant,
 } from '../models';
+import { COPY_ERRORS } from '../../copy';
 import { primaryPayerId, validateAdvancePayers } from './advance-allocation';
 
 export interface SplitPreviewLine {
@@ -228,16 +229,16 @@ export function validateCreateInput(
   members: Member[]
 ): string | null {
   if (!input.title.trim()) {
-    return '請填寫項目名稱';
+    return COPY_ERRORS.titleRequired;
   }
   if (!input.date?.trim()) {
-    return '請選擇日期';
+    return COPY_ERRORS.dateRequired;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-    return '日期格式不正確';
+    return COPY_ERRORS.dateInvalid;
   }
   if (input.totalAmount <= 0) {
-    return '總金額必須大於 0';
+    return COPY_ERRORS.amountPositive;
   }
 
   const payers =
@@ -255,21 +256,21 @@ export function validateCreateInput(
       : input.participantIds;
 
   if (allParticipantIds.length === 0) {
-    return '請至少選擇一位分攤成員';
+    return COPY_ERRORS.splitMemberRequired;
   }
 
   const excluded = new Set(input.excludedMemberIds ?? []);
   const payingCount = allParticipantIds.filter((id) => !excluded.has(id)).length;
 
   if (payingCount === 0) {
-    return '至少需要一位成員參與分攤';
+    return COPY_ERRORS.splitParticipantRequired;
   }
 
   const preview = buildSplitPreview(input, members);
 
   if (input.splitMode === 'equal') {
     if (preview.remainderAmount > 0 && !preview.remainderBearerId) {
-      return '僅代墊者一人分攤時無法分配零頭，請標記其他成員免分攤';
+      return COPY_ERRORS.solePayerRemainder;
     }
   }
 
@@ -292,13 +293,13 @@ export function validateRepaymentInput(
   amount: number
 ): string | null {
   if (!fromMemberId || !toMemberId) {
-    return '請選擇還款對象';
+    return COPY_ERRORS.repaymentTargetRequired;
   }
   if (fromMemberId === toMemberId) {
-    return '還款對象不能是自己';
+    return COPY_ERRORS.repaymentSelf;
   }
   if (amount <= 0) {
-    return '還款金額必須大於 0';
+    return COPY_ERRORS.repaymentAmountPositive;
   }
   return null;
 }

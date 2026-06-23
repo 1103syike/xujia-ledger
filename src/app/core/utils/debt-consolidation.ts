@@ -4,6 +4,7 @@ import {
   TransactionParticipant,
   TransferEdge,
 } from '../models';
+import { COPY_ERRORS, COPY_RECORD_TYPE } from '../../copy';
 import { advanceSettlementEdges } from './advance-allocation';
 
 export interface MemberConsolidationRow {
@@ -19,7 +20,7 @@ export interface ConsolidationPreview {
   hasDebts: boolean;
 }
 
-const TRANSFER_ITEM_NOTE = '債務轉移';
+const TRANSFER_ITEM_NOTE = COPY_RECORD_TYPE.consolidate;
 
 export function isConsolidatable(tx: Transaction): boolean {
   return (
@@ -215,15 +216,15 @@ export function validateConsolidationInput(
   allTransactions: Transaction[],
   allMemberIds: string[]
 ): string | null {
-  if (sourceIds.length === 0) return '請至少勾選一筆代墊交易';
+  if (sourceIds.length === 0) return COPY_ERRORS.consolidatePickOne;
   const byId = new Map(allTransactions.map((t) => [t.id, t]));
   for (const id of sourceIds) {
     const tx = byId.get(id);
-    if (!tx) return '找不到部分勾選的交易';
-    if (!isConsolidatable(tx)) return '僅能整合未結清的代墊交易';
+    if (!tx) return COPY_ERRORS.consolidateNotFound;
+    if (!isConsolidatable(tx)) return COPY_ERRORS.consolidateOnlyActive;
   }
   const selected = sourceIds.map((id) => byId.get(id)!);
   const preview = buildConsolidationPreview(selected, allMemberIds);
-  if (!preview.hasDebts) return '勾選的交易之間沒有待結算債務';
+  if (!preview.hasDebts) return COPY_ERRORS.consolidateNoDebt;
   return null;
 }

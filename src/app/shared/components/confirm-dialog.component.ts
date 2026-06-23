@@ -11,53 +11,8 @@ import { CommonModule } from '@angular/common';
   selector: 'app-confirm-dialog',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div
-      *ngIf="open"
-      class="fixed inset-0 z-50 flex items-center justify-center px-6"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-labelledby]="titleId"
-      [attr.aria-describedby]="messageId"
-    >
-      <button
-        type="button"
-        class="absolute inset-0 bg-ink/25 backdrop-blur-[2px]"
-        aria-label="取消"
-        (click)="cancel()"
-      ></button>
+  templateUrl: './confirm-dialog.component.html',
 
-      <div
-        class="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl"
-        (click)="$event.stopPropagation()"
-      >
-        <p [id]="titleId" class="section-title">{{ title }}</p>
-        <p *ngIf="detail" class="item-title mt-2">{{ detail }}</p>
-        <p [id]="messageId" class="helper-text mt-2">{{ message }}</p>
-
-        <div class="mt-5 flex gap-2">
-          <button
-            type="button"
-            class="btn-secondary btn-sm flex-1"
-            [disabled]="busy"
-            (click)="cancel()"
-          >
-            {{ cancelLabel }}
-          </button>
-          <button
-            type="button"
-            class="btn-sm flex-1"
-            [class.btn-danger]="destructive"
-            [class.btn-primary]="!destructive"
-            [disabled]="busy"
-            (click)="confirm()"
-          >
-            {{ busy ? busyLabel : confirmLabel }}
-          </button>
-        </div>
-      </div>
-    </div>
-  `,
 })
 export class ConfirmDialogComponent {
   @Input() open = false;

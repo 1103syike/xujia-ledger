@@ -36,6 +36,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'transactions/:id/edit',
+        loadComponent: () =>
+          import('./features/transactions/transaction-create.component').then(
+            (m) => m.TransactionCreateComponent
+          ),
+        data: { edit: true },
+      },
+      {
         path: 'transactions/:id',
         loadComponent: () =>
           import('./features/transactions/transaction-detail.component').then(
@@ -66,7 +74,7 @@ export const routes: Routes = [
       { path: 'expenses', redirectTo: 'transactions', pathMatch: 'full' },
       { path: 'expenses/new', redirectTo: 'transactions/new', pathMatch: 'full' },
       { path: 'expenses/:id', redirectTo: 'transactions/:id' },
-      { path: 'expenses/:id/edit', redirectTo: 'transactions/:id' },
+      { path: 'expenses/:id/edit', redirectTo: 'transactions/:id/edit' },
       { path: 'pending', redirectTo: '' },
     ],
   },

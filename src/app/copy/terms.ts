@@ -1,0 +1,20 @@
+/** 核心名詞（全 App 唯一正式名稱） */
+export const COPY_TERMS = {
+  record: '記錄',
+  ledger: '帳本',
+  splitBill: '分帳',
+  repayment: '還款',
+  consolidate: '整合欠款',
+  payer: '付款人',
+  grossPaid: '實付',
+  split: '分攤',
+  noSplit: '不用分',
+  change: '找零',
+  oweYou: '欠你',
+  youOwe: '你欠',
+  unrelated: '跟你無關',
+  offset: '剛好抵銷',
+  pending: '待結清',
+  consolidated: '已整合',
+  cancelRecord: '取消這筆',
+} as const;

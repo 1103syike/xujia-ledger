@@ -16,41 +16,8 @@ import { MemberAvatarComponent } from './member-avatar.component';
   selector: 'app-member-net-chips',
   standalone: true,
   imports: [CommonModule, MemberAvatarComponent],
-  template: `
-    <div
-      *ngIf="rows.length > 0"
-      class="member-net-chips"
-      [class.mt-3]="!compact"
-      [style.--member-net-cols]="columnCount"
-    >
-      <div
-        *ngFor="let row of rows"
-        class="member-net-chip"
-        [class.text-debt]="row.net < 0"
-        [class.text-positive]="row.net > 0"
-        [style.background-color]="
-          memberColorSoftBg(auth.getMember(row.memberId)?.color || '')
-        "
-        [style.box-shadow]="
-          'inset 0 0 0 1px ' +
-          memberColorBorder(auth.getMember(row.memberId)?.color || '')
-        "
-      >
-        <app-member-avatar
-          *ngIf="auth.getMember(row.memberId) as member"
-          [member]="member"
-          size="xs"
-        />
-        <span *ngIf="showName" class="member-net-chip__name">{{
-          memberName(row.memberId)
-        }}</span>
-        <span class="member-net-chip__amount">
-          <ng-container *ngIf="row.net < 0">{{ formatOwe(-row.net) }}</ng-container>
-          <ng-container *ngIf="row.net > 0">{{ formatOwed(row.net) }}</ng-container>
-        </span>
-      </div>
-    </div>
-  `,
+  templateUrl: './member-net-chips.component.html',
+
 })
 export class MemberNetChipsComponent {
   @Input() rows: MemberNetRow[] = [];
@@ -72,5 +39,9 @@ export class MemberNetChipsComponent {
 
   memberName(id: string): string {
     return this.auth.getMember(id)?.name ?? id;
+  }
+
+  rowAmount(row: MemberNetRow): number {
+    return row.displayNet ?? row.net;
   }
 }

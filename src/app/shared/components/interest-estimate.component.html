@@ -1,0 +1,39 @@
+    <div *ngIf="principal > 0" class="interest-estimate">
+      <p *ngIf="showPrincipal" class="caption-text">
+        本金 NT$ {{ principal | number: '1.0-0' }}
+        <span class="interest-estimate__hint">（利息計算僅供參考）</span>
+      </p>
+      <div class="interest-estimate__table-wrap">
+        <table class="interest-estimate__table">
+          <thead>
+            <tr>
+              <th scope="col">期間</th>
+              <th
+                *ngFor="let scheme of schemes"
+                scope="col"
+                [class.interest-estimate__th-shark]="scheme.id !== 'bank'"
+              >
+                {{ scheme.shortLabel }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of table">
+              <th scope="row">{{ row.period.label }}</th>
+              <td
+                *ngFor="let scheme of schemes"
+                [class.interest-estimate__td-shark]="scheme.id !== 'bank'"
+              >
+                <span class="interest-estimate__total">{{
+                  total(row.amounts[scheme.id]) | number: '1.0-0'
+                }}</span>
+                <span class="interest-estimate__fee"
+                  >(+{{ row.amounts[scheme.id] | number: '1.0-0' }})</span
+                >
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  

@@ -1,0 +1,116 @@
+    <app-kaomoji-loading *ngIf="loading" message="登入中，請稍候" />
+
+    <div class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-cream px-6 py-10">
+      <div class="relative z-10 mb-6 text-center">
+        <div class="logo-mark">
+          <app-app-logo [size]="80" label="許家帳本" />
+        </div>
+        <h1 class="page-title mt-4 text-2xl">許家帳本</h1>
+        <p class="helper-text mt-2">
+          {{ selectedMember ? '請輸入登入密碼' : '請選擇您的帳號' }}
+        </p>
+        <app-kaomoji-deco
+          *ngIf="!selectedMember"
+          class="mt-2 block"
+          mood="login"
+          seed="login-title"
+          [salt]="loginKaomojiSalt"
+          size="sm"
+        />
+      </div>
+
+      <ng-container *ngIf="!selectedMember; else passwordStep">
+        <div class="deco-banner deco-banner--subtle relative z-10 mb-4 w-full max-w-sm">
+          <app-deco-illustration kind="group" alt="許家五人" />
+        </div>
+
+        <button
+          *ngIf="quickMember as member"
+          type="button"
+          class="card relative z-10 mb-4 w-full max-w-sm text-left transition active:scale-[0.99]"
+          (click)="quickLogin(member)"
+        >
+          <p class="caption-text mb-2 text-center">快速登入</p>
+          <div class="flex items-center gap-3">
+            <app-member-avatar [member]="member" size="lg" />
+            <div class="min-w-0 flex-1">
+              <p class="item-title">{{ displayNameOf(member) }}</p>
+              <p class="caption-text">{{ member.name }}</p>
+            </div>
+            <span class="chip bg-mint/40 text-xs">上次登入</span>
+          </div>
+        </button>
+
+        <div
+          *ngIf="quickMember"
+          class="relative z-10 mb-3 w-full max-w-sm text-center"
+        >
+          <span class="caption-text">或選擇其他成員</span>
+        </div>
+
+        <div class="relative z-10 flex w-full max-w-sm flex-wrap justify-center gap-3">
+          <button
+            *ngFor="let member of otherMembers"
+            type="button"
+            class="login-member-card flex w-[calc(50%-0.375rem)] flex-col items-center gap-2 rounded-3xl bg-white p-4 shadow-sm transition active:scale-[0.97]"
+            [class.login-member-card--recent]="isRecent(member.id)"
+            (click)="selectMember(member)"
+          >
+            <app-member-avatar [member]="member" size="lg" />
+            <p class="item-title text-center">{{ displayNameOf(member) }}</p>
+            <p class="caption-text text-center">{{ member.name }}</p>
+            <span *ngIf="isRecent(member.id)" class="chip bg-lavender/50 text-xs">
+              最近
+            </span>
+          </button>
+        </div>
+      </ng-container>
+
+      <ng-template #passwordStep>
+        <div class="card-stack relative z-10 w-full max-w-sm">
+          <div class="flex items-center gap-3 inset-panel">
+            <app-member-avatar [member]="selectedMember!" size="lg" />
+            <div class="min-w-0 flex-1">
+              <p class="item-title">{{ displayNameOf(selectedMember!) }}</p>
+              <p class="caption-text">{{ selectedMember!.name }}</p>
+            </div>
+            <button
+              type="button"
+              class="caption-text shrink-0"
+              (click)="clearSelection()"
+            >
+              重新選擇
+            </button>
+          </div>
+
+          <div>
+            <label class="field-label">登入密碼</label>
+            <input
+              #passwordInput
+              type="password"
+              class="input input-amount"
+              placeholder="請輸入登入密碼"
+              [(ngModel)]="password"
+              [disabled]="loading"
+              (keydown.enter)="login()"
+            />
+            <p class="caption-text mt-1">
+              <ng-container *ngIf="passwordRemembered">已帶入上次密碼，可直接登入</ng-container>
+              <ng-container *ngIf="!passwordRemembered">密碼長度不拘，可於設定頁修改</ng-container>
+            </p>
+          </div>
+
+          <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
+
+          <button
+            type="button"
+            class="btn-primary w-full py-3"
+            [disabled]="loading || !password"
+            (click)="login()"
+          >
+            登入
+          </button>
+        </div>
+      </ng-template>
+    </div>
+  

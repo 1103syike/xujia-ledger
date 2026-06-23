@@ -1,0 +1,14 @@
+    <div class="view-switch" role="tablist">
+      <button
+        *ngFor="let opt of options"
+        type="button"
+        role="tab"
+        class="view-switch__btn"
+        [class.view-switch__btn--active]="value === opt.id"
+        [attr.aria-selected]="value === opt.id"
+        (click)="select(opt.id)"
+      >
+        {{ opt.label }}
+      </button>
+    </div>
+  

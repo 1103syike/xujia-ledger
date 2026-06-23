@@ -10,21 +10,8 @@ export interface ViewSwitchOption {
   selector: 'app-view-switch',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="view-switch" role="tablist">
-      <button
-        *ngFor="let opt of options"
-        type="button"
-        role="tab"
-        class="view-switch__btn"
-        [class.view-switch__btn--active]="value === opt.id"
-        [attr.aria-selected]="value === opt.id"
-        (click)="select(opt.id)"
-      >
-        {{ opt.label }}
-      </button>
-    </div>
-  `,
+  templateUrl: './view-switch.component.html',
+
 })
 export class ViewSwitchComponent {
   @Input({ required: true }) options: ViewSwitchOption[] = [];

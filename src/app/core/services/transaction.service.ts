@@ -37,12 +37,15 @@ import {
   advanceChangeAmount,
   primaryPayerId,
 } from '../utils/advance-allocation';
+import { attachPayerChangeLineItems } from '../utils/advance-display';
+import { diffAdvanceUpdate } from '../utils/advance-audit-diff';
 import { formatFirestoreError, stripUndefined } from '../utils/firestore-data';
 import {
   compareTransactionsByDate,
   normalizeTransaction,
 } from '../utils/transaction-date';
 import { AuthService } from './auth.service';
+import { COPY_ERRORS, COPY_RECORD_TYPE } from '../../copy';
 
 function memberName(auth: AuthService, id: string): string {
   return auth.getMember(id)?.name ?? id;
@@ -102,7 +105,7 @@ export class TransactionService implements OnDestroy {
 
   async createAdvance(input: CreateAdvanceInput): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入帳號';
+    if (!actor) return COPY_ERRORS.loginRequired;
 
     const error = validateCreateInput(input, this.auth.getAllMembers());
     if (error) return error;
@@ -153,6 +156,8 @@ export class TransactionService implements OnDestroy {
       participants,
     };
 
+    attachPayerChangeLineItems(transaction);
+
     const balances = advanceMemberBalances(transaction);
     for (const p of transaction.participants) {
       const net = balances.get(p.memberId);
@@ -200,9 +205,110 @@ export class TransactionService implements OnDestroy {
   /** @deprecated 使用 createAdvance */
   createExpense = this.createAdvance.bind(this);
 
+  async updateAdvance(
+    transactionId: string,
+    input: CreateAdvanceInput
+  ): Promise<string | null> {
+    const actor = this.auth.currentMember;
+    if (!actor) return COPY_ERRORS.loginRequired;
+
+    const existing = this.getTransaction(transactionId);
+    if (!existing) return COPY_ERRORS.recordNotFound;
+    if (existing.type !== 'advance') return COPY_ERRORS.onlySplitBillEditable;
+    if (existing.status !== 'active') return COPY_ERRORS.recordCancelled;
+    if (existing.settledByTransferId) {
+      return COPY_ERRORS.alreadyConsolidated;
+    }
+
+    const error = validateCreateInput(input, this.auth.getAllMembers());
+    if (error) return error;
+
+    const seed = existing.id;
+    const preview = buildSplitPreview(
+      { ...input, remainderSeed: input.remainderSeed ?? seed },
+      this.auth.getAllMembers()
+    );
+    const payers =
+      input.payers?.length ?
+        input.payers.map((p) => ({ ...p }))
+      : [{ memberId: input.payerId, amount: input.totalAmount }];
+    const payerIds = payers.map((p) => p.memberId);
+    const participants = previewToParticipants(
+      preview,
+      primaryPayerId(payers),
+      payerIds,
+      input.splitNotes,
+      input.splitItems
+    );
+    const now = new Date().toISOString();
+    const isLegacy = this.legacyTransactionIds.has(transactionId);
+
+    const transaction: Transaction = {
+      ...existing,
+      title: input.title.trim(),
+      date: input.date,
+      totalAmount: input.totalAmount,
+      billTotal: input.billTotal ?? null,
+      payerId: primaryPayerId(payers),
+      payers,
+      changeAmount: advanceChangeAmount(payers, input.totalAmount) || null,
+      participantScope: input.participantScope,
+      participantIds:
+        input.participantScope === 'all'
+          ? this.auth.getAllMembers().map((m) => m.id)
+          : [...input.participantIds],
+      splitMode: input.splitMode,
+      note: input.note?.trim() || null,
+      remainderBearerId: preview.remainderBearerId,
+      remainderAmount: preview.remainderAmount,
+      updatedAt: now,
+      participants,
+    };
+
+    const changes = diffAdvanceUpdate(existing, transaction, (id) =>
+      memberName(this.auth, id)
+    );
+    if (changes.length === 0) {
+      return null;
+    }
+
+    attachPayerChangeLineItems(transaction);
+
+    const balances = advanceMemberBalances(transaction);
+    for (const p of transaction.participants) {
+      const net = balances.get(p.memberId);
+      if (net !== undefined) p.signedAmount = net;
+    }
+
+    try {
+      const payload = stripUndefined({
+        ...transaction,
+        status: isLegacy ? 'open' : 'active',
+      });
+      await updateDoc(this.transactionDocRef(transactionId), payload);
+      await this.addAudit({
+        actorId: actor.id,
+        action: 'transaction.advance.updated',
+        entityType: 'transaction',
+        entityId: transactionId,
+        payload: stripUndefined({
+          title: transaction.title,
+          changes,
+        }),
+      });
+      return null;
+    } catch (error) {
+      console.error('updateAdvance failed', error);
+      return formatFirestoreError(error);
+    }
+  }
+
+  /** @deprecated 使用 updateAdvance */
+  updateExpense = this.updateAdvance.bind(this);
+
   async createRepayment(input: CreateRepaymentInput): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入帳號';
+    if (!actor) return COPY_ERRORS.loginRequired;
 
     const error = validateRepaymentInput(
       input.fromMemberId,
@@ -299,7 +405,7 @@ export class TransactionService implements OnDestroy {
       id: seed,
       accountId: DEFAULT_ACCOUNT_ID,
       type: 'transfer',
-      title: input.title?.trim() || '債務轉移',
+      title: input.title?.trim() || COPY_RECORD_TYPE.consolidate,
       date: input.date,
       totalAmount: preview.totalTransferVolume,
       payerId: actor.id,
@@ -360,23 +466,27 @@ export class TransactionService implements OnDestroy {
     }
   }
 
-  private sourceDocRef(sourceId: string) {
-    const coll = this.legacyTransactionIds.has(sourceId)
+  private transactionDocRef(transactionId: string) {
+    const coll = this.legacyTransactionIds.has(transactionId)
       ? 'expenses'
       : 'transactions';
-    return doc(firestoreDb, coll, sourceId);
+    return doc(firestoreDb, coll, transactionId);
+  }
+
+  private sourceDocRef(sourceId: string) {
+    return this.transactionDocRef(sourceId);
   }
 
   async voidTransaction(transactionId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
-    if (!actor) return '請先登入帳號';
+    if (!actor) return COPY_ERRORS.loginRequired;
 
     const transaction = this.transactions.find((t) => t.id === transactionId);
-    if (!transaction) return '找不到此筆交易';
-    if (transaction.status !== 'active') return '此筆交易已作廢';
+    if (!transaction) return COPY_ERRORS.recordNotFound;
+    if (transaction.status !== 'active') return COPY_ERRORS.recordCancelled;
 
     if (transaction.settledByTransferId) {
-      return '此筆已納入債務轉移，請先作廢該筆整合交易';
+      return '這筆已整合，請先取消那筆整合記錄';
     }
 
     try {
@@ -415,7 +525,7 @@ export class TransactionService implements OnDestroy {
       });
       return null;
     } catch {
-      return '作廢失敗，請稍後再試';
+      return COPY_ERRORS.cancelFailed;
     }
   }
 

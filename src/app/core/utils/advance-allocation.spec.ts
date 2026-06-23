@@ -1,11 +1,15 @@
 import { Transaction } from '../models';
 import {
   advanceChangeAmount,
+  advanceChangeShareByMember,
   advanceMemberBalances,
   advanceNetPaidByMember,
   advanceSettlementEdges,
+  memberNetDisplayAmount,
   validateAdvancePayers,
 } from './advance-allocation';
+import { payerChangeBreakdown } from './advance-display';
+import { memberNetRowsForTransaction } from './transaction-member-nets';
 
 function multiPayerAdvance(
   payers: Array<{ memberId: string; amount: number }>,
@@ -94,6 +98,47 @@ describe('advance-allocation', () => {
     const cToB = edges.find((e) => e.fromId === 'm3' && e.toId === 'm2');
     expect(cToA?.amount).toBe(250);
     expect(cToB?.amount).toBe(250);
+  });
+
+  it('non-eating payer shows gross recovery while settlement stays net', () => {
+    const tx = multiPayerAdvance(
+      [
+        { memberId: 'tingyu', amount: 1000 },
+        { memberId: 'user', amount: 1000 },
+      ],
+      [
+        { memberId: 'tingyu', amount: 0 },
+        { memberId: 'user', amount: 371 },
+        { memberId: 'm3', amount: 371 },
+        { memberId: 'm4', amount: 371 },
+        { memberId: 'm5', amount: 373 },
+      ]
+    );
+    tx.totalAmount = 1486;
+
+    expect(advanceChangeAmount(tx.payers!, 1486)).toBe(514);
+    expect(advanceMemberBalances(tx).get('tingyu')).toBe(743);
+    expect(advanceMemberBalances(tx).get('user')).toBe(372);
+    expect(memberNetDisplayAmount(tx, 'tingyu')).toBe(1000);
+    expect(memberNetDisplayAmount(tx, 'user')).toBe(372);
+
+    const tingyuBreakdown = payerChangeBreakdown(tx, 'tingyu');
+    expect(tingyuBreakdown?.changeShare).toBe(257);
+    expect(tingyuBreakdown?.lineItems).toEqual([
+      { note: '找錢（已退回）', amount: 257 },
+      { note: '待他人結算', amount: 743 },
+    ]);
+
+    const userBreakdown = payerChangeBreakdown(tx, 'user');
+    expect(userBreakdown?.changeShare).toBe(257);
+    expect(userBreakdown?.lineItems).toEqual([
+      { note: '找錢（已退回）', amount: 257 },
+    ]);
+
+    const rows = memberNetRowsForTransaction(tx);
+    const tingyuRow = rows.find((r) => r.memberId === 'tingyu');
+    expect(tingyuRow?.net).toBe(743);
+    expect(tingyuRow?.displayNet).toBe(1000);
   });
 
   it('falls back to single payerId for legacy data', () => {

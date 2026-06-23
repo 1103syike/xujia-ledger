@@ -6,19 +6,8 @@ import { pickKaomoji } from '../../core/utils/kaomoji-pools';
   selector: 'app-kaomoji-loading',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div
-      class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-cream/92 px-6 backdrop-blur-sm"
-      role="status"
-      aria-live="polite"
-    >
-      <p class="kaomoji-deco mb-4 min-h-[2rem] text-center">{{ face }}</p>
-      <div class="h-2.5 w-56 overflow-hidden rounded-full bg-peach/20">
-        <div class="loading-bar h-full rounded-full"></div>
-      </div>
-      <p class="helper-text mt-3">{{ message }}</p>
-    </div>
-  `,
+  templateUrl: './kaomoji-loading.component.html',
+
 })
 export class KaomojiLoadingComponent implements OnInit, OnDestroy {
   @Input() message = '載入中，請稍候';

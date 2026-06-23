@@ -1,0 +1,16 @@
+    <img
+      *ngIf="slotImageSrc; else chibiTpl"
+      class="member-avatar-photo"
+      [src]="slotImageSrc"
+      [attr.width]="pixelSize"
+      [attr.height]="pixelSize"
+      [attr.alt]="member.name"
+    />
+    <ng-template #chibiTpl>
+      <app-member-chibi-head
+        [chibiId]="chibiId"
+        [name]="member.name"
+        [size]="pixelSize"
+      />
+    </ng-template>
+  

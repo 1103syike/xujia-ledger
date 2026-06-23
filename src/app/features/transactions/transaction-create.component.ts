@@ -8,9 +8,10 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription, combineLatest, filter, startWith, take } from 'rxjs';
+import { Subscription, combineLatest, filter, map, startWith, take } from 'rxjs';
 import {
   CreateAdvanceInput,
+  DEFAULT_ACCOUNT_ID,
   DisplayMember,
   LineItem,
   SplitMode,
@@ -21,7 +22,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { TransactionService } from '../../core/services/transaction.service';
 import {
   buildSplitPreview,
-  calculateEqualSplitAmong,
+  previewToParticipants,
   SplitPreview,
   validateCreateInput,
   validateRepaymentInput,
@@ -31,16 +32,40 @@ import {
   ConsolidationPreview,
   validateConsolidationInput,
 } from '../../core/utils/debt-consolidation';
-import { advanceChangeAmount } from '../../core/utils/advance-allocation';
+import {
+  buildAdvanceInputFromDraft,
+  computeStickySummary,
+  CustomInputMethod,
+  inferSplitRuleFromTransaction,
+  SplitRule,
+} from '../../core/utils/advance-draft';
+import {
+  advanceChangeAmount,
+  getAdvancePayers,
+  primaryPayerId,
+} from '../../core/utils/advance-allocation';
+import { filterManualLineItems } from '../../core/utils/advance-display';
+import { formatOweAmount } from '../../core/utils/settlement-display';
 import { amountViewerOwesOther } from '../../core/utils/ledger-calculator';
 import { activeTransactions, formatTransactionDateLabel, todayLocalDate } from '../../core/utils/transaction-date';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { MemberSelectGridComponent } from '../../shared/components/member-select-grid.component';
 import { MemberPickerComponent } from '../../shared/components/member-picker.component';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SplitPieChartComponent } from '../../shared/components/split-pie-chart.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 import { TransferBreakdownComponent } from '../../shared/components/transfer-breakdown.component';
+import {
+  COPY_ACTIONS,
+  COPY_DIALOGS,
+  COPY_EMPTY,
+  COPY_ERRORS,
+  COPY_PAGES,
+  COPY_RECORD_TYPE,
+  COPY_SPLIT,
+  COPY_TERMS,
+} from '../../copy';
 
 type CreateMode = 'advance' | 'repayment' | 'transfer';
 
@@ -63,6 +88,7 @@ interface PayerDraft {
     ReactiveFormsModule,
     RouterLink,
     MemberAvatarComponent,
+    MemberSelectGridComponent,
     MemberPickerComponent,
     DateFieldComponent,
     SplitPieChartComponent,
@@ -70,259 +96,19 @@ interface PayerDraft {
     KaomojiDecoComponent,
     TransferBreakdownComponent,
   ],
-  template: `
-    <div class="page">
-      <a routerLink="/transactions" class="back-link">← 返回</a>
+  templateUrl: './transaction-create.component.html',
 
-      <div class="page-title-bar">
-        <h2 class="page-title">新增交易</h2>
-      </div>
-
-      <div class="card-stack mb-4">
-        <p class="card-title">交易類型</p>
-        <div class="flex gap-2">
-          <button type="button" class="mode-chip flex-1" [class.bg-mint]="mode === 'advance'" [class.text-ink]="mode === 'advance'" [class.bg-cream]="mode !== 'advance'" (click)="setMode('advance')">代墊</button>
-          <button type="button" class="mode-chip flex-1" [class.bg-lavender]="mode === 'repayment'" [class.text-ink]="mode === 'repayment'" [class.bg-cream]="mode !== 'repayment'" (click)="setMode('repayment')">還款</button>
-          <button type="button" class="mode-chip flex-1" [class.bg-coral]="mode === 'transfer'" [class.text-white]="mode === 'transfer'" [class.bg-cream]="mode !== 'transfer'" [class.text-ink]="mode !== 'transfer'" (click)="setMode('transfer')">債務整合</button>
-        </div>
-      </div>
-
-      <form *ngIf="mode === 'advance'" [formGroup]="advanceForm" (ngSubmit)="submitAdvance()" class="stack-lg pb-28">
-        <div class="card-stack">
-          <div class="field-group">
-            <label class="field-label">項目</label>
-            <input formControlName="title" class="input" placeholder="請輸入項目名稱，例：飲料、晚餐" />
-          </div>
-          <app-date-field formControlName="date" />
-          <div class="card-stack inset-panel">
-            <div class="mb-2 flex items-center justify-between gap-2">
-              <p class="card-title mb-0">代墊者</p>
-              <button type="button" class="btn-secondary btn-sm" (click)="addPayer()">＋ 新增</button>
-            </div>
-            <div class="stack-sm">
-              <div
-                *ngFor="let row of payerRows; let i = index"
-                class="flex items-end gap-2"
-              >
-                <div class="min-w-0 flex-1">
-                  <app-member-picker
-                    [label]="payerRows.length > 1 ? '代墊者 ' + (i + 1) : '代墊者'"
-                    [members]="membersForPayerRow(i)"
-                    [value]="row.memberId"
-                    (valueChange)="setPayerMember(i, $event)"
-                  />
-                </div>
-                <div class="field-group w-28 shrink-0">
-                  <label class="field-label">金額</label>
-                  <input
-                    type="number"
-                    inputmode="numeric"
-                    class="input input-amount"
-                    [ngModel]="row.amount"
-                    [ngModelOptions]="{ standalone: true }"
-                    placeholder="0"
-                    (ngModelChange)="setPayerAmount(i, $event)"
-                  />
-                </div>
-                <button
-                  *ngIf="payerRows.length > 1"
-                  type="button"
-                  class="caption-text mb-2 shrink-0 text-coral"
-                  (click)="removePayer(i)"
-                >
-                  移除
-                </button>
-              </div>
-            </div>
-            <p class="caption-text mt-2">
-              實付合計 NT$ {{ payerTotal }}
-              <ng-container *ngIf="effectiveTotal > 0">
-                · 分攤總額 NT$ {{ effectiveTotal }}
-              </ng-container>
-            </p>
-            <p *ngIf="payerChange > 0" class="helper-text mt-1 text-positive">
-              找零 NT$ {{ payerChange }}（依實付比例退回代墊者，計入結算淨代墊
-              NT$ {{ effectiveTotal }}）
-            </p>
-            <p
-              *ngIf="effectiveTotal > 0 && payerTotal > 0 && payerTotal < effectiveTotal"
-              class="helper-text mt-1 text-coral"
-            >
-              實付合計不可少於分攤總額
-            </p>
-          </div>
-        </div>
-
-        <div class="card-stack">
-          <p class="card-title">分攤方式</p>
-          <div class="flex gap-2">
-            <button type="button" class="mode-chip" [class.bg-mint]="splitMode === 'equal'" [class.text-ink]="splitMode === 'equal'" [class.bg-cream]="splitMode !== 'equal'" (click)="setSplitMode('equal')">平分</button>
-            <button type="button" class="mode-chip" [class.bg-lavender]="splitMode === 'itemized'" [class.text-ink]="splitMode === 'itemized'" [class.bg-cream]="splitMode !== 'itemized'" (click)="setSplitMode('itemized')">細分</button>
-          </div>
-
-          <ng-container *ngIf="splitMode === 'equal'">
-            <div class="field-group">
-              <label class="field-label">總金額</label>
-              <input formControlName="totalAmount" type="number" inputmode="numeric" class="input input-amount" placeholder="0" />
-            </div>
-            <p class="helper-text">請標記免分攤的成員，再點選快速平分</p>
-            <div class="flex flex-wrap gap-2">
-              <button *ngFor="let m of members" type="button" class="chip inline-flex items-center gap-1.5 transition" [ngClass]="isSkipped(m.id) ? 'bg-lavender text-ink line-through opacity-70' : 'bg-cream text-ink'" (click)="toggleSkip(m.id)">
-                <app-member-avatar [member]="m" size="xs" /><span>{{ m.name }}</span>
-              </button>
-            </div>
-            <button type="button" class="btn-secondary btn-sm w-full" [disabled]="payingCount === 0 || effectiveTotal <= 0" (click)="applyQuickEqual()">快速平分（{{ payingCount }} 人）</button>
-          </ng-container>
-
-          <ng-container *ngIf="splitMode === 'itemized'">
-            <p class="helper-text">請於各成員下方新增消費項目，全員皆可查看明細</p>
-            <div class="field-group">
-              <label class="field-label">帳單總額（選填）</label>
-              <input formControlName="billTotal" type="number" inputmode="numeric" class="input input-amount" placeholder="若高於已分攤金額，圓餅圖將顯示未分配餘額" />
-            </div>
-            <div class="stack-sm">
-              <div *ngFor="let m of members" class="inset-panel" [class.opacity-50]="isSkipped(m.id)">
-                <div class="mb-2 flex items-center justify-between gap-2">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <app-member-avatar [member]="m" size="sm" />
-                    <span class="item-title truncate">{{ m.name }}</span>
-                  </div>
-                  <div class="flex shrink-0 items-center gap-2">
-                    <button type="button" class="chip bg-white" [class.bg-lavender]="isSkipped(m.id)" (click)="toggleSkip(m.id)">{{ isSkipped(m.id) ? '取消免分攤' : '標記免分攤' }}</button>
-                    <span *ngIf="!isSkipped(m.id)" class="amount-highlight text-sm">NT$ {{ memberSubtotals[m.id] || '-' }}</span>
-                  </div>
-                </div>
-                <ng-container *ngIf="!isSkipped(m.id)">
-                  <div *ngFor="let item of memberItems[m.id] ?? []; let i = index" class="mb-1 flex items-center justify-between gap-2 body-text">
-                    <span class="min-w-0 flex-1 truncate">{{ item.note }}</span>
-                    <span class="shrink-0">NT$ {{ item.amount }}</span>
-                    <button type="button" class="caption-text shrink-0 text-coral" (click)="removeMemberItem(m.id, i)">移除</button>
-                  </div>
-                  <div class="mt-2 flex gap-2">
-                    <input class="input-sm min-w-0 flex-1" [(ngModel)]="memberDrafts[m.id].note" [ngModelOptions]="{ standalone: true }" placeholder="項目備註" />
-                    <input type="number" inputmode="numeric" class="input-sm input-amount w-20 shrink-0 text-right" [(ngModel)]="memberDrafts[m.id].amount" [ngModelOptions]="{ standalone: true }" placeholder="金額" (keydown.enter)="addMemberItem(m.id); $event.preventDefault()" />
-                    <button type="button" class="btn-primary btn-sm shrink-0 px-3" (click)="addMemberItem(m.id)">＋</button>
-                  </div>
-                </ng-container>
-                <p *ngIf="isSkipped(m.id)" class="caption-text">免分攤</p>
-              </div>
-            </div>
-            <p class="amount-md text-right">總計 NT$ {{ effectiveTotal }}</p>
-          </ng-container>
-
-          <div class="field-group">
-            <label class="field-label">備註（選填）</label>
-            <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
-          </div>
-        </div>
-
-        <div *ngIf="preview" class="card-stack">
-          <p class="card-title">分攤比例</p>
-          <app-split-pie-chart [slices]="previewSlices" [totalAmount]="effectiveTotal" [billTotal]="chartBillTotal" />
-        </div>
-
-        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
-        <button type="submit" class="btn-primary w-full">建立代墊</button>
-      </form>
-
-      <form *ngIf="mode === 'repayment'" [formGroup]="repaymentForm" (ngSubmit)="submitRepayment()" class="stack-lg pb-28">
-        <div class="card-stack">
-          <app-date-field formControlName="date" />
-
-          <ng-container *ngIf="hasRepaymentCreditors; else noRepaymentCreditors">
-            <app-member-picker
-              label="還款對象"
-              [members]="repaymentTargets"
-              [oweAmounts]="repaymentOweAmounts"
-              [value]="repaymentForm.value.toMemberId"
-              (valueChange)="setRepaymentTarget($event)"
-            />
-            <div class="field-group">
-              <label class="field-label">還款金額</label>
-              <div class="flex gap-2">
-                <input formControlName="amount" type="number" inputmode="numeric" class="input input-amount flex-1" placeholder="0" />
-                <button type="button" class="btn-secondary btn-sm shrink-0" [disabled]="!repaymentBalance || repaymentBalance <= 0" (click)="fillFullRepayment()">全部還清</button>
-              </div>
-            </div>
-            <div class="field-group">
-              <label class="field-label">備註（選填）</label>
-              <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
-            </div>
-          </ng-container>
-
-          <ng-template #noRepaymentCreditors>
-            <div class="empty-state py-6">
-              <app-kaomoji-deco mood="celebrate" seed="no-repay" [salt]="noRepaySalt" />
-              <p class="empty-state__text">目前沒有待還款項</p>
-              <p class="helper-text mt-1">帳本已結清，暫時不需要建立還款</p>
-              <button type="button" class="caption-text mt-2 rounded-full bg-cream px-3 py-1 active:scale-95" (click)="noRepaySalt = noRepaySalt + 1">🔄 換顏文字</button>
-            </div>
-          </ng-template>
-        </div>
-        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
-        <button type="submit" class="btn-primary w-full" [disabled]="!hasRepaymentCreditors">建立還款</button>
-      </form>
-
-      <form *ngIf="mode === 'transfer'" [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="stack-lg pb-28">
-        <div class="card-stack">
-          <app-date-field formControlName="date" />
-          <div class="field-group">
-            <label class="field-label">備註（選填）</label>
-            <textarea formControlName="note" rows="2" class="textarea" placeholder="如需補充說明，請在此填寫"></textarea>
-          </div>
-        </div>
-
-        <div class="card-stack">
-          <p class="card-title">已勾選交易（{{ selectedSourceTx.length }} 筆）</p>
-          <p *ngIf="selectedSourceTx.length === 0" class="helper-text">
-            請至
-            <a routerLink="/transactions" [queryParams]="{ consolidate: '1' }" class="text-coral underline" (click)="$event.stopPropagation()">交易清單</a>
-            勾選要整合的代墊，或點選下方按鈕
-          </p>
-          <a
-            *ngIf="selectedSourceTx.length === 0"
-            routerLink="/transactions"
-            [queryParams]="{ consolidate: '1' }"
-            class="btn-secondary btn-sm inline-block"
-          >
-            前往勾選交易
-          </a>
-          <div *ngIf="selectedSourceTx.length > 0" class="stack-sm">
-            <div *ngFor="let tx of selectedSourceTx" class="inset-panel flex items-center justify-between gap-2">
-              <div class="min-w-0">
-                <p class="item-title text-sm">{{ tx.title }}</p>
-                <p class="caption-text">NT$ {{ tx.totalAmount }}</p>
-              </div>
-              <button type="button" class="caption-text text-coral" (click)="removeSource(tx.id)">移除</button>
-            </div>
-          </div>
-        </div>
-
-        <app-transfer-breakdown
-          *ngIf="transferPreview?.hasDebts"
-          [edges]="transferEdges"
-          [memberRows]="transferMemberRows"
-        />
-
-        <p *ngIf="selectedSourceTx.length > 0 && !transferPreview?.hasDebts" class="helper-text text-center">
-          勾選的交易之間沒有待結算債務
-        </p>
-
-        <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
-        <button
-          type="submit"
-          class="btn-primary w-full"
-          [disabled]="!transferPreview?.hasDebts"
-        >
-          建立債務轉移
-        </button>
-      </form>
-
-      <app-confirm-dialog [open]="submitDialogOpen" [title]="submitDialogTitle" [detail]="submitDialogDetail" [message]="submitDialogMessage" confirmLabel="確認建立" cancelLabel="取消" [busy]="submitBusy" (confirmed)="confirmSubmit()" (cancelled)="closeSubmitDialog()" />
-    </div>
-  `,
 })
 export class TransactionCreateComponent implements OnInit, OnDestroy {
+  actions = COPY_ACTIONS;
+  pages = COPY_PAGES;
+  terms = COPY_TERMS;
+  split = COPY_SPLIT;
+  recordType = COPY_RECORD_TYPE;
+  empty = COPY_EMPTY;
+  dialogs = COPY_DIALOGS;
+  errors = COPY_ERRORS;
+  nav = { ledger: COPY_PAGES.ledger };
   mode: CreateMode = 'advance';
   advanceForm: FormGroup;
   repaymentForm: FormGroup;
@@ -332,7 +118,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   repaymentOweAmounts: Record<string, number> = {};
   hasRepaymentCreditors = false;
   noRepaySalt = 0;
-  splitMode: SplitMode = 'itemized';
+  splitRule: SplitRule = 'equal';
+  customInputMethod: CustomInputMethod = 'lineItems';
   memberItems: Record<string, LineItem[]> = {};
   memberDrafts: Record<string, MemberDraft> = {};
   memberSubtotals: Record<string, number> = {};
@@ -360,10 +147,19 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     lineItems: LineItem[];
   }> = [];
   payerRows: PayerDraft[] = [];
+  addingItemFor: string | null = null;
+  successOpen = false;
+  successTitle = '';
+  successAmount = 0;
+  successImpactLines: Array<{ fromName: string; toName: string; amount: number }> = [];
+  formatOwe = formatOweAmount;
+  isEditMode = false;
+  editTransactionId: string | null = null;
   private skippedMembers = new Set<string>();
   private subs: Subscription[] = [];
   private activeTx: Transaction[] = [];
   private initialRepaymentToId: string | null = null;
+  private editHydrated = false;
 
   constructor(
     public auth: AuthService,
@@ -396,6 +192,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.isEditMode = !!this.route.snapshot.data['edit'];
+    this.editTransactionId = this.route.snapshot.paramMap.get('id');
+
+    if (this.isEditMode && this.editTransactionId) {
+      this.mode = 'advance';
+      this.tryLoadTransaction(this.editTransactionId);
+    }
+
     const typeParam = this.route.snapshot.queryParamMap.get('type');
     if (typeParam === 'repayment') {
       this.mode = 'repayment';
@@ -552,6 +356,162 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     this.refreshPreview();
   }
 
+  get splitMode(): SplitMode {
+    return this.splitRule === 'equal' ? 'equal' : 'itemized';
+  }
+
+  get stickySummary() {
+    const payers = this.payerRows
+      .filter((row) => row.memberId)
+      .map((row) => ({
+        memberId: row.memberId,
+        amount: Number(row.amount) || 0,
+      }));
+    return computeStickySummary(this.effectiveTotal, payers);
+  }
+
+  get advanceSubmitHint(): string {
+    return validateCreateInput(this.buildAdvanceInput(), this.members) ?? '';
+  }
+
+  get canSubmitAdvance(): boolean {
+    return !this.advanceSubmitHint;
+  }
+
+  get equalPerPersonLabel(): string | null {
+    if (this.splitRule !== 'equal' || !this.preview || this.payingCount === 0) {
+      return null;
+    }
+    const amounts = this.preview.lines
+      .filter((line) => line.amount > 0)
+      .map((line) => line.amount);
+    if (amounts.length === 0) return null;
+
+    const unique = [...new Set(amounts)];
+    if (unique.length === 1) {
+      return `每人 NT$ ${unique[0]}`;
+    }
+
+    const base = Math.min(...amounts);
+    return `每人約 NT$ ${base}（含零頭分配）`;
+  }
+
+  selectPrimaryPayer(memberId: string): void {
+    if (this.payerRows.length === 1) {
+      this.payerRows = [{ memberId, amount: this.payerRows[0].amount }];
+      this.syncSinglePayerAmount();
+      this.refreshPreview();
+    }
+  }
+
+  disabledPayerIdsForRow(index: number): string[] {
+    return this.payerRows
+      .map((row, i) => (i === index ? '' : row.memberId))
+      .filter(Boolean);
+  }
+
+  previewAmountFor(memberId: string): number {
+    return this.preview?.lines.find((line) => line.memberId === memberId)?.amount ?? 0;
+  }
+
+  toggleAddItem(memberId: string): void {
+    this.addingItemFor = this.addingItemFor === memberId ? null : memberId;
+  }
+
+  goToTransactions(): void {
+    void this.router.navigateByUrl('/transactions');
+  }
+
+  createAnother(): void {
+    this.successOpen = false;
+    this.successImpactLines = [];
+    this.resetAdvanceForm();
+  }
+
+  private resetAdvanceForm(): void {
+    const defaultPayer = this.auth.currentMember?.id ?? this.members[0]?.id ?? '';
+    this.advanceForm.reset({
+      title: '',
+      date: todayLocalDate(),
+      totalAmount: null,
+      billTotal: null,
+      note: '',
+    });
+    this.payerRows = [{ memberId: defaultPayer, amount: '' }];
+    this.splitRule = 'equal';
+    this.customInputMethod = 'lineItems';
+    this.memberItems = {};
+    this.manualAmounts = {};
+    this.skippedMembers = new Set();
+    this.addingItemFor = null;
+    this.error = '';
+    this.remainderSeed = crypto.randomUUID?.() ?? String(Date.now());
+    this.initDrafts();
+    this.refreshPreview();
+  }
+
+  private buildPreviewTransaction(): Transaction | null {
+    if (!this.preview) return null;
+
+    const input = this.buildAdvanceInput();
+    const payers =
+      input.payers?.length ?
+        input.payers
+      : [{ memberId: input.payerId, amount: input.totalAmount }];
+    const payerIds = payers.map((p) => p.memberId);
+    const participants = previewToParticipants(
+      this.preview,
+      primaryPayerId(payers),
+      payerIds,
+      undefined,
+      input.splitItems
+    );
+
+    const transaction: Transaction = {
+      id: 'preview',
+      accountId: DEFAULT_ACCOUNT_ID,
+      type: 'advance',
+      title: input.title.trim(),
+      date: input.date,
+      totalAmount: input.totalAmount,
+      billTotal: input.billTotal ?? null,
+      payerId: primaryPayerId(payers),
+      payers,
+      changeAmount: advanceChangeAmount(payers, input.totalAmount) || null,
+      participantScope: 'all',
+      participantIds: this.members.map((m) => m.id),
+      splitMode: input.splitMode,
+      note: input.note,
+      remainderBearerId: this.preview.remainderBearerId,
+      remainderAmount: this.preview.remainderAmount,
+      status: 'active',
+      createdBy: this.auth.currentMember?.id ?? '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      participants,
+    };
+
+    return transaction;
+  }
+
+  private buildSuccessImpactLines(
+    tx: Transaction
+  ): Array<{ fromName: string; toName: string; amount: number }> {
+    const payers = getAdvancePayers(tx);
+    const payerIds = new Set(payers.map((p) => p.memberId));
+    const creditorName = payers
+      .map((p) => this.auth.getMember(p.memberId)?.name ?? p.memberId)
+      .join('、');
+
+    return tx.participants
+      .filter((p) => p.amount > 0 && !payerIds.has(p.memberId))
+      .map((p) => ({
+        fromName: this.auth.getMember(p.memberId)?.name ?? p.memberId,
+        toName: creditorName,
+        amount: p.amount,
+      }));
+  }
+
   addMemberItem(memberId: string): void {
     const draft = this.memberDrafts[memberId];
     if (!draft) return;
@@ -565,6 +525,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     this.memberItems = { ...this.memberItems, [memberId]: [...(this.memberItems[memberId] ?? []), { note, amount }] };
     draft.note = '';
     draft.amount = '';
+    this.addingItemFor = null;
     this.syncAmountsFromItems();
     this.refreshPreview();
   }
@@ -578,18 +539,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   get payerTotal(): number {
-    return this.payerRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    return this.stickySummary.grossPaid;
   }
 
   get payerChange(): number {
-    if (this.effectiveTotal <= 0) return 0;
-    const payers = this.payerRows
-      .filter((row) => row.memberId)
-      .map((row) => ({
-        memberId: row.memberId,
-        amount: Number(row.amount) || 0,
-      }));
-    return advanceChangeAmount(payers, this.effectiveTotal);
+    return this.stickySummary.change;
   }
 
   membersForPayerRow(index: number): DisplayMember[] {
@@ -634,12 +588,27 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     this.refreshPreview();
   }
 
+  /**
+   * 單人代墊時同步實付金額：
+   * - 細分：實付不足分攤總額時自動補齊；付更多（找錢）則不動
+   * - 平分：僅空欄時預填分攤總額
+   */
   private syncSinglePayerAmount(): void {
     if (this.payerRows.length !== 1) return;
     const total = this.effectiveTotal;
     if (total <= 0) return;
     const row = this.payerRows[0];
-    if (!String(row.amount ?? '').trim()) {
+    const current = Number(row.amount) || 0;
+    const isEmpty = !String(row.amount ?? '').trim();
+
+    if (this.splitRule === 'custom') {
+      if (current < total) {
+        this.payerRows = [{ ...row, amount: String(total) }];
+      }
+      return;
+    }
+
+    if (isEmpty) {
       this.payerRows = [{ ...row, amount: String(total) }];
     }
   }
@@ -652,15 +621,42 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     }
   }
 
-  setSplitMode(mode: SplitMode): void {
-    this.splitMode = mode;
-    if (mode === 'equal') {
+  setSplitRule(rule: SplitRule): void {
+    if (this.splitRule === rule) return;
+    this.splitRule = rule;
+    if (rule === 'equal') {
       this.memberItems = {};
       this.initDrafts();
-    } else {
-      this.manualAmounts = {};
     }
     this.refreshPreview();
+  }
+
+  setCustomInputMethod(method: CustomInputMethod): void {
+    if (this.customInputMethod === method) return;
+    if (method === 'direct') {
+      for (const m of this.members) {
+        const subtotal = this.memberSubtotals[m.id] ?? 0;
+        if (subtotal > 0 && !this.isSkipped(m.id)) {
+          this.manualAmounts = { ...this.manualAmounts, [m.id]: subtotal };
+        }
+      }
+    }
+    this.customInputMethod = method;
+    this.refreshPreview();
+  }
+
+  setDirectAmount(memberId: string, value: string | number): void {
+    const amount = Number(value) || 0;
+    this.manualAmounts = { ...this.manualAmounts, [memberId]: amount };
+    if (amount > 0) {
+      this.skippedMembers.delete(memberId);
+    }
+    this.refreshPreview();
+  }
+
+  /** @deprecated 使用 setSplitRule */
+  setSplitMode(mode: SplitMode): void {
+    this.setSplitRule(mode === 'equal' ? 'equal' : 'custom');
   }
 
   isSkipped(id: string): boolean {
@@ -675,24 +671,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       this.skippedMembers.add(id);
       this.manualAmounts[id] = 0;
       this.memberItems = { ...this.memberItems, [id]: [] };
+      if (this.addingItemFor === id) {
+        this.addingItemFor = null;
+      }
     }
     this.syncAmountsFromItems();
-    this.refreshPreview();
-  }
-
-  applyQuickEqual(): void {
-    const total = this.effectiveTotal;
-    if (total <= 0) {
-      this.error = '請先輸入總金額';
-      return;
-    }
-    const payingIds = this.members.filter((m) => !this.skippedMembers.has(m.id)).map((m) => m.id);
-    if (payingIds.length === 0) {
-      this.error = '至少需要一位成員參與分攤';
-      return;
-    }
-    this.error = '';
-    calculateEqualSplitAmong(total, payingIds, this.payerRows[0]?.memberId ?? '', this.remainderSeed);
     this.refreshPreview();
   }
 
@@ -713,19 +696,25 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   submitAdvance(): void {
-    this.error = validateCreateInput(this.buildAdvanceInput(), this.members) ?? '';
+    this.error = this.advanceSubmitHint;
     if (this.error) return;
-    const title = (this.advanceForm.value.title ?? '').trim();
-    const date = this.advanceForm.value.date ?? '';
-    this.submitDialogTitle = '建立代墊';
-    this.submitDialogDetail = `${formatTransactionDateLabel(date)} · ${title} · NT$ ${this.effectiveTotal}`;
-    this.submitDialogMessage = '確定要建立此筆代墊嗎？建立後全員皆可查看。';
-    this.submitDialogOpen = true;
+
+    if (this.isEditMode) {
+      const title = (this.advanceForm.value.title ?? '').trim();
+      const date = this.advanceForm.value.date ?? '';
+      this.submitDialogTitle = COPY_DIALOGS.saveSplitTitle;
+      this.submitDialogDetail = `${formatTransactionDateLabel(date)} · ${title} · NT$ ${this.effectiveTotal}`;
+      this.submitDialogMessage = COPY_DIALOGS.saveSplitMessage;
+      this.submitDialogOpen = true;
+      return;
+    }
+
+    void this.confirmSubmit();
   }
 
   submitRepayment(): void {
     if (!this.hasRepaymentCreditors) {
-      this.error = '目前沒有可還款的對象';
+      this.error = COPY_ERRORS.noRepaymentTarget;
       return;
     }
     const viewer = this.auth.currentMember;
@@ -737,9 +726,9 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     this.error = validateRepaymentInput(viewer.id, v.toMemberId, Number(v.amount)) ?? '';
     if (this.error) return;
     const toName = this.auth.getMember(v.toMemberId)?.name ?? '';
-    this.submitDialogTitle = '建立還款';
+    this.submitDialogTitle = COPY_DIALOGS.addRepaymentTitle;
     this.submitDialogDetail = `${formatTransactionDateLabel(v.date)} · 還款給 ${toName} · NT$ ${v.amount}`;
-    this.submitDialogMessage = '確定要建立此筆還款嗎？建立後結算會立即更新。';
+    this.submitDialogMessage = COPY_DIALOGS.addRepaymentMessage;
     this.submitDialogOpen = true;
   }
 
@@ -752,10 +741,9 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       ) ?? '';
     if (this.error) return;
     const v = this.transferForm.value;
-    this.submitDialogTitle = '建立債務轉移';
-    this.submitDialogDetail = `${formatTransactionDateLabel(v.date)} · 債務轉移 · 整合 ${this.selectedSourceIds.length} 筆交易`;
-    this.submitDialogMessage =
-      '確定要建立此筆債務轉移嗎？來源代墊將標記為已整合，結算會立即更新。';
+    this.submitDialogTitle = COPY_DIALOGS.consolidateTitle;
+    this.submitDialogDetail = `${formatTransactionDateLabel(v.date)} · ${COPY_RECORD_TYPE.consolidate} · 整合 ${this.selectedSourceIds.length} 筆記錄`;
+    this.submitDialogMessage = COPY_DIALOGS.consolidateMessage;
     this.submitDialogOpen = true;
   }
 
@@ -770,7 +758,18 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     try {
       let err: string | null = null;
       if (this.mode === 'advance') {
-        err = await this.transactions.createAdvance(this.buildAdvanceInput());
+        const input = this.buildAdvanceInput();
+        const previewTx = this.buildPreviewTransaction();
+        err =
+          this.isEditMode && this.editTransactionId
+            ? await this.transactions.updateAdvance(this.editTransactionId, input)
+            : await this.transactions.createAdvance(input);
+
+        if (!err && !this.isEditMode && previewTx) {
+          this.submitDialogOpen = false;
+          await this.router.navigateByUrl('/transactions');
+          return;
+        }
       } else if (this.mode === 'repayment') {
         const viewer = this.auth.currentMember!;
         const v = this.repaymentForm.value;
@@ -816,14 +815,21 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   private computeEffectiveTotal(): number {
-    if (this.splitMode === 'itemized') {
-      return this.members.filter((m) => !this.isSkipped(m.id)).reduce((sum, m) => sum + (this.memberSubtotals[m.id] ?? 0), 0);
+    if (this.splitRule === 'equal') {
+      return Number(this.advanceForm.value.totalAmount) || 0;
     }
-    return Number(this.advanceForm.value.totalAmount) || 0;
+    if (this.customInputMethod === 'direct') {
+      return this.members
+        .filter((m) => !this.isSkipped(m.id))
+        .reduce((sum, m) => sum + (this.manualAmounts[m.id] ?? 0), 0);
+    }
+    return this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .reduce((sum, m) => sum + (this.memberSubtotals[m.id] ?? 0), 0);
   }
 
   private computeChartBillTotal(): number | null {
-    if (this.splitMode === 'equal') {
+    if (this.splitRule === 'equal') {
       const total = Number(this.advanceForm.value.totalAmount) || 0;
       return total > 0 ? total : null;
     }
@@ -835,12 +841,24 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     const subtotals: Record<string, number> = {};
     const amounts: Record<string, number> = {};
     for (const m of this.members) {
-      const subtotal = (this.memberItems[m.id] ?? []).reduce((sum, item) => sum + item.amount, 0);
-      subtotals[m.id] = subtotal;
-      amounts[m.id] = this.splitMode === 'itemized' ? (this.isSkipped(m.id) ? 0 : subtotal) : (this.manualAmounts[m.id] ?? 0);
+      if (this.splitRule === 'custom' && this.customInputMethod === 'lineItems') {
+        const subtotal = (this.memberItems[m.id] ?? []).reduce(
+          (sum, item) => sum + item.amount,
+          0
+        );
+        subtotals[m.id] = subtotal;
+        amounts[m.id] = this.isSkipped(m.id) ? 0 : subtotal;
+      } else if (this.splitRule === 'custom' && this.customInputMethod === 'direct') {
+        const amount = this.isSkipped(m.id) ? 0 : (this.manualAmounts[m.id] ?? 0);
+        amounts[m.id] = amount;
+        subtotals[m.id] = amount;
+      } else {
+        amounts[m.id] = this.manualAmounts[m.id] ?? 0;
+        subtotals[m.id] = amounts[m.id];
+      }
     }
     this.memberSubtotals = subtotals;
-    if (this.splitMode === 'itemized') {
+    if (this.splitRule === 'custom') {
       this.manualAmounts = amounts;
     }
   }
@@ -854,22 +872,21 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
         memberId: row.memberId,
         amount: Number(row.amount) || 0,
       }));
-    return {
+    return buildAdvanceInputFromDraft({
       title: v.title ?? '',
       date: v.date ?? todayLocalDate(),
-      totalAmount: this.effectiveTotal,
-      billTotal: this.chartBillTotal,
-      payerId: payers[0]?.memberId ?? '',
-      payers,
-      participantScope: 'all',
-      participantIds: this.members.map((m) => m.id),
-      splitMode: this.splitMode,
       note: v.note || null,
-      splitItems: Object.keys(splitItems).length > 0 ? splitItems : undefined,
-      manualAmounts: { ...this.manualAmounts },
+      splitRule: this.splitRule,
+      customInputMethod: this.customInputMethod,
+      splitTotal: this.effectiveTotal,
+      chartBillTotal: this.chartBillTotal,
+      payers,
+      members: this.members,
       excludedMemberIds: [...this.skippedMembers],
+      manualAmounts: { ...this.manualAmounts },
+      splitItems: Object.keys(splitItems).length > 0 ? splitItems : undefined,
       remainderSeed: this.remainderSeed,
-    };
+    });
   }
 
   private pruneSplitItems(): Record<string, LineItem[]> {
@@ -878,5 +895,92 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       if (items.length > 0) result[id] = items;
     }
     return result;
+  }
+
+  private tryLoadTransaction(id: string): void {
+    const existing = this.transactions.getTransaction(id);
+    if (existing) {
+      this.applyTransaction(existing);
+      return;
+    }
+
+    this.subs.push(
+      this.transactions.transactions$
+        .pipe(
+          map((list) => list.find((t) => t.id === id)),
+          filter((t): t is Transaction => !!t),
+          take(1)
+        )
+        .subscribe((tx) => this.applyTransaction(tx))
+    );
+  }
+
+  private applyTransaction(tx: Transaction): void {
+    if (this.editHydrated) return;
+    if (tx.type !== 'advance') {
+      void this.router.navigate(['/transactions', tx.id]);
+      return;
+    }
+    if (tx.status !== 'active') {
+      void this.router.navigate(['/transactions', tx.id]);
+      return;
+    }
+    if (tx.settledByTransferId) {
+      void this.router.navigate(['/transactions', tx.id]);
+      return;
+    }
+
+    this.editHydrated = true;
+    this.mode = 'advance';
+    const inferred = inferSplitRuleFromTransaction(tx);
+    this.splitRule = inferred.splitRule;
+    this.customInputMethod = inferred.customInputMethod;
+    this.remainderSeed = tx.id;
+    this.skippedMembers = new Set(
+      tx.participants.filter((p) => p.amount === 0).map((p) => p.memberId)
+    );
+
+    this.advanceForm.patchValue({
+      title: tx.title,
+      date: tx.date ?? todayLocalDate(),
+      totalAmount: this.splitRule === 'equal' ? tx.totalAmount : null,
+      billTotal: tx.billTotal ?? null,
+      note: tx.note ?? '',
+    });
+
+    this.payerRows = getAdvancePayers(tx).map((p) => ({
+      memberId: p.memberId,
+      amount: String(p.amount),
+    }));
+    if (this.payerRows.length === 0) {
+      this.payerRows = [{ memberId: tx.payerId, amount: String(tx.totalAmount) }];
+    }
+
+    if (this.splitRule === 'custom' && this.customInputMethod === 'lineItems') {
+      const items: Record<string, LineItem[]> = {};
+      for (const p of tx.participants) {
+        const manual = filterManualLineItems(p.lineItems).map((item) => ({ ...item }));
+        if (manual.length > 0) {
+          items[p.memberId] = manual;
+        }
+      }
+      this.memberItems = items;
+    } else if (this.splitRule === 'custom' && this.customInputMethod === 'direct') {
+      const amounts: Record<string, number> = {};
+      for (const p of tx.participants) {
+        amounts[p.memberId] = p.amount;
+      }
+      this.manualAmounts = amounts;
+    } else {
+      const amounts: Record<string, number> = {};
+      for (const p of tx.participants) {
+        amounts[p.memberId] = p.amount;
+      }
+      this.manualAmounts = amounts;
+    }
+
+    this.initDrafts();
+    this.syncAmountsFromItems();
+    this.refreshPreview();
   }
 }

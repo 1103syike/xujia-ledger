@@ -9,16 +9,8 @@ import {
   selector: 'app-deco-illustration',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <img
-      [src]="src"
-      [alt]="alt"
-      class="deco-illustration"
-      [ngClass]="'deco-illustration--' + kind"
-      loading="lazy"
-      decoding="async"
-    />
-  `,
+  templateUrl: './deco-illustration.component.html',
+
 })
 export class DecoIllustrationComponent {
   @Input({ required: true }) kind!: IllustrationKind;

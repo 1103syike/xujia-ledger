@@ -174,7 +174,7 @@ describe('ledger-calculator', () => {
     ];
 
     const rows = creditorsOwedByMember(txs, 'm1');
-    expect(rows).toHaveLength(1);
+    expect(rows.length).toBe(1);
     expect(rows[0].toId).toBe('m2');
     expect(rows[0].amount).toBe(161);
   });

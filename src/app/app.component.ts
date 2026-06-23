@@ -8,10 +8,8 @@ import { KaomojiLoadingComponent } from './shared/components/kaomoji-loading.com
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, RouterOutlet, KaomojiLoadingComponent],
-  template: `
-    <app-kaomoji-loading *ngIf="!authReady" message="正在載入，請稍候" />
-    <router-outlet />
-  `,
+  templateUrl: './app.component.html',
+
   styles: [`:host { display: block; min-height: 100%; }`],
 })
 export class AppComponent implements OnInit {

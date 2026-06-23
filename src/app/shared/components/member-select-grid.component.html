@@ -1,0 +1,22 @@
+    <div
+      class="member-select-grid"
+      [class.member-select-grid--compact]="compact"
+      [attr.role]="multiple ? 'group' : 'radiogroup'"
+      [attr.aria-label]="label"
+    >
+      <button
+        *ngFor="let m of members"
+        type="button"
+        class="member-select-grid__item"
+        [class.member-select-grid__item--selected]="isSelected(m.id)"
+        [class.member-select-grid__item--disabled]="isDisabled(m.id)"
+        [disabled]="isDisabled(m.id)"
+        [attr.aria-pressed]="isSelected(m.id)"
+        (click)="onTap(m.id)"
+      >
+        <app-member-avatar [member]="m" [size]="compact ? 'sm' : 'md'" />
+        <span class="member-select-grid__name">{{ m.name }}</span>
+        <span *ngIf="isSelected(m.id)" class="member-select-grid__check" aria-hidden="true">●</span>
+      </button>
+    </div>
+  

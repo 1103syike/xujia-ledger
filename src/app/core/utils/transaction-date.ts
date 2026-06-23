@@ -1,4 +1,5 @@
 import { Transaction, TransactionParticipant } from '../models';
+import { COPY_RECORD_TYPE } from '../../copy';
 
 /** 本地時區 YYYY-MM-DD */
 export function todayLocalDate(): string {
@@ -142,7 +143,7 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
       id: raw.id,
       accountId: raw.accountId ?? 'default',
       type: 'transfer',
-      title: raw.title || '債務轉移',
+      title: raw.title || COPY_RECORD_TYPE.consolidate,
       date: normalizeTransactionDate(raw),
       totalAmount: raw.totalAmount,
       payerId: raw.payerId ?? '',
@@ -199,13 +200,13 @@ export function activeTransactions(transactions: Transaction[]): Transaction[] {
 export function transactionTypeLabel(type: Transaction['type']): string {
   switch (type) {
     case 'advance':
-      return '代墊';
+      return COPY_RECORD_TYPE.splitBill;
     case 'repayment':
-      return '還款';
+      return COPY_RECORD_TYPE.repayment;
     case 'adjustment':
-      return '調整';
+      return COPY_RECORD_TYPE.adjustment;
     case 'transfer':
-      return '債務轉移';
+      return COPY_RECORD_TYPE.consolidate;
     default:
       return type;
   }

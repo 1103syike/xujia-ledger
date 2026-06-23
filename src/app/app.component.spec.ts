@@ -1,27 +1,23 @@
 import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 import { AppComponent } from './app.component';
+import { AuthService } from './core/services/auth.service';
 
 describe('AppComponent', () => {
-  beforeEach(() => TestBed.configureTestingModule({
-    imports: [AppComponent]
-  }));
+  beforeEach(() =>
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        {
+          provide: AuthService,
+          useValue: { authReady$: of(true) },
+        },
+      ],
+    })
+  );
 
   it('should create the app', () => {
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
-  });
-
-  it(`should have the 'xujia-ledger' title`, () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual('xujia-ledger');
-  });
-
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.content span')?.textContent).toContain('xujia-ledger app is running!');
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });

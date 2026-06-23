@@ -1,47 +1,25 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ExpenseService } from '../../core/services/expense.service';
 import { formatAuditLog } from '../../core/utils/audit-formatter';
 import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
+import { COPY_ACTIONS, COPY_EMPTY, COPY_PAGES } from '../../copy';
 
 @Component({
   selector: 'app-audit',
   standalone: true,
-  imports: [CommonModule, KaomojiDecoComponent],
-  template: `
-    <div class="page">
-      <div class="page-title-bar">
-        <h2 class="page-title">操作紀錄</h2>
-      </div>
+  imports: [CommonModule, RouterLink, KaomojiDecoComponent],
+  templateUrl: './audit.component.html',
 
-      <div *ngIf="(logs$ | async)?.length === 0" class="empty-state">
-        <app-kaomoji-deco mood="audit" seed="audit-empty" />
-        <p class="empty-state__text">尚無操作紀錄</p>
-      </div>
-
-      <div class="stack-sm">
-        <div *ngFor="let item of logs$ | async" class="card body-text">
-          <div class="flex items-start justify-between gap-2">
-            <p class="card-title">{{ item.display.title }}</p>
-            <p class="caption-text shrink-0">
-              {{ item.log.createdAt | date: 'M/d HH:mm' }}
-            </p>
-          </div>
-          <p
-            *ngFor="let line of item.display.lines"
-            class="helper-text mt-1"
-            [class.font-medium]="line.includes('建立') || line.includes('移除') || line.includes('確認') || line.includes('標記')"
-          >
-            {{ line }}
-          </p>
-        </div>
-      </div>
-    </div>
-  `,
 })
 export class AuditComponent {
+  pages = COPY_PAGES;
+  empty = COPY_EMPTY;
+  actions = COPY_ACTIONS;
+
   logs$ = this.expenses.auditLogs$.pipe(
     map((logs) =>
       logs.map((log) => ({

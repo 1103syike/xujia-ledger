@@ -1,4 +1,5 @@
 import { AdvancePayer, BalanceEdge, Transaction } from '../models';
+import { COPY_ERRORS } from '../../copy';
 
 /** 讀取代墊者（相容舊資料的單一 payerId） */
 export function getAdvancePayers(tx: Transaction): AdvancePayer[] {
@@ -24,24 +25,47 @@ export function advanceChangeAmount(
   return Math.max(0, advanceGrossPaidTotal(payers) - billTotal);
 }
 
+/** 依實付比例分配找零（各代墊者應退回的金額） */
+export function advanceChangeShareByMember(
+  tx: Transaction
+): Map<string, number> {
+  const payers = getAdvancePayers(tx);
+  const grossTotal = advanceGrossPaidTotal(payers);
+  const change = advanceChangeAmount(payers, tx.totalAmount);
+  const shares = new Map<string, number>();
+
+  if (change <= 0 || grossTotal <= 0) return shares;
+
+  for (const p of payers) {
+    shares.set(p.memberId, Math.round((change * p.amount) / grossTotal));
+  }
+
+  const sum = [...shares.values()].reduce((s, v) => s + v, 0);
+  const diff = change - sum;
+  if (diff !== 0) {
+    const top = [...payers].sort((a, b) => b.amount - a.amount)[0];
+    if (top) shares.set(top.memberId, (shares.get(top.memberId) ?? 0) + diff);
+  }
+
+  return shares;
+}
+
 /**
  * 計入結算的實際代墊：實付 − 依比例分回的找零
  * 例：帳單 1486，各付 1000 → 找零 514，每人淨代墊 743
  */
 export function advanceNetPaidByMember(tx: Transaction): Map<string, number> {
   const payers = getAdvancePayers(tx);
-  const grossTotal = advanceGrossPaidTotal(payers);
-  const change = advanceChangeAmount(payers, tx.totalAmount);
+  const changeShares = advanceChangeShareByMember(tx);
   const net = new Map<string, number>();
 
-  if (grossTotal <= 0) return net;
+  if (advanceGrossPaidTotal(payers) <= 0) return net;
 
   for (const p of payers) {
-    const changeShare =
-      change > 0 ? Math.round((change * p.amount) / grossTotal) : 0;
-    net.set(p.memberId, p.amount - changeShare);
+    net.set(p.memberId, p.amount - (changeShares.get(p.memberId) ?? 0));
   }
 
+  const change = advanceChangeAmount(payers, tx.totalAmount);
   if (change > 0) {
     const netSum = [...net.values()].reduce((s, v) => s + v, 0);
     const diff = tx.totalAmount - netSum;
@@ -52,6 +76,27 @@ export function advanceNetPaidByMember(tx: Transaction): Map<string, number> {
   }
 
   return net;
+}
+
+/**
+ * 分攤明細顯示用淨額（結算邏輯不變）
+ * 免分攤代墊者：顯示實付全額收回（找錢另列明細）
+ */
+export function memberNetDisplayAmount(
+  tx: Transaction,
+  memberId: string
+): number {
+  const settlementNet = advanceMemberBalances(tx).get(memberId) ?? 0;
+  if (tx.type !== 'advance' || settlementNet <= 0) return settlementNet;
+
+  const payer = getAdvancePayers(tx).find((p) => p.memberId === memberId);
+  if (!payer) return settlementNet;
+
+  const share = advanceSharesByMember(tx).get(memberId) ?? 0;
+  const changeShare = advanceChangeShareByMember(tx).get(memberId) ?? 0;
+  if (changeShare <= 0 || share > 0) return settlementNet;
+
+  return payer.amount;
 }
 
 /** 每人分攤金額 */
@@ -160,18 +205,18 @@ export function validateAdvancePayers(
   payers: AdvancePayer[],
   totalAmount: number
 ): string | null {
-  if (payers.length === 0) return '請至少選擇一位代墊者';
+  if (payers.length === 0) return COPY_ERRORS.payerRequired;
   const ids = new Set<string>();
   let sum = 0;
   for (const p of payers) {
-    if (!p.memberId) return '請選擇代墊者';
-    if (ids.has(p.memberId)) return '代墊者不可重複';
+    if (!p.memberId) return COPY_ERRORS.payerPick;
+    if (ids.has(p.memberId)) return COPY_ERRORS.payerDuplicate;
     ids.add(p.memberId);
-    if (p.amount <= 0) return '代墊金額必須大於 0';
+    if (p.amount <= 0) return COPY_ERRORS.payerAmountPositive;
     sum += p.amount;
   }
   if (sum < totalAmount) {
-    return `代墊合計（NT$ ${sum}）不可少於分攤總額（NT$ ${totalAmount}）`;
+    return COPY_ERRORS.payerTotalShort(sum, totalAmount);
   }
   return null;
 }

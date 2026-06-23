@@ -25,23 +25,8 @@ import { MemberChibiHeadComponent } from './member-chibi-head.component';
   standalone: true,
   imports: [CommonModule, MemberChibiHeadComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <img
-      *ngIf="slotImageSrc; else chibiTpl"
-      class="member-avatar-photo"
-      [src]="slotImageSrc"
-      [attr.width]="pixelSize"
-      [attr.height]="pixelSize"
-      [attr.alt]="member.name"
-    />
-    <ng-template #chibiTpl>
-      <app-member-chibi-head
-        [chibiId]="chibiId"
-        [name]="member.name"
-        [size]="pixelSize"
-      />
-    </ng-template>
-  `,
+  templateUrl: './member-avatar.component.html',
+
 })
 export class MemberAvatarComponent implements OnChanges {
   @Input({ required: true }) member!: Member | DisplayMember;

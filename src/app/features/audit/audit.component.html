@@ -1,0 +1,38 @@
+    <div class="page">
+      <div class="page-title-bar">
+        <h2 class="page-title">{{ pages.changes }}</h2>
+      </div>
+      <p class="helper-text -mt-2 mb-4">{{ pages.changesSubtitle }}</p>
+
+      <div *ngIf="(logs$ | async)?.length === 0" class="empty-state">
+        <app-kaomoji-deco mood="audit" seed="audit-empty" />
+        <p class="empty-state__text">{{ empty.noChanges }}</p>
+      </div>
+
+      <div class="stack-sm">
+        <div *ngFor="let item of logs$ | async" class="card body-text">
+          <div class="flex items-start justify-between gap-2">
+            <p class="card-title">{{ item.display.title }}</p>
+            <p class="caption-text shrink-0">
+              {{ item.log.createdAt | date: 'M/d HH:mm' }}
+            </p>
+          </div>
+          <p
+            *ngFor="let line of item.display.lines; let i = index"
+            class="helper-text mt-1"
+            [class.font-medium]="i === 0"
+            [class.audit-diff-line]="line.includes('→')"
+          >
+            {{ line }}
+          </p>
+          <a
+            *ngIf="item.display.entityId"
+            [routerLink]="['/transactions', item.display.entityId]"
+            class="audit-card__link mt-2 inline-block"
+          >
+            {{ actions.viewRecord }} →
+          </a>
+        </div>
+      </div>
+    </div>
+  
