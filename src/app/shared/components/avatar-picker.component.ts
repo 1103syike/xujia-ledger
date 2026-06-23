@@ -38,7 +38,7 @@ import { MemberChibiHeadComponent } from './member-chibi-head.component';
         *ngIf="slotMessage"
         class="caption-text mb-2 text-center"
         [class.text-coral]="slotError"
-        [class.text-mint]="!slotError"
+        [class.text-positive]="!slotError"
       >
         {{ slotMessage }}
       </p>
