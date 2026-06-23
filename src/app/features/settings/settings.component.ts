@@ -6,6 +6,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { MemberProfileService } from '../../core/services/member-profile.service';
 import { ThemeService } from '../../core/services/theme.service';
 import {
+  AvatarChoice,
+  DisplayMember,
   MEMBER_COLOR_OPTIONS,
   THEME_PRESETS,
   ThemePresetId,
@@ -13,18 +15,20 @@ import {
   getThemePreset,
   memberColorLabel,
   normalizeThemePresetId,
+  resolveAvatarChoice,
 } from '../../core/models';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { AvatarPickerComponent } from '../../shared/components/avatar-picker.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, MemberAvatarComponent, ConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, MemberAvatarComponent, AvatarPickerComponent, ConfirmDialogComponent],
   template: `
     <div class="page" *ngIf="auth.currentMember as me">
       <div class="flex items-center gap-3">
-        <app-member-avatar [member]="me" size="lg" />
+        <app-member-avatar [member]="previewMember ?? me" size="lg" />
         <div>
           <h2 class="page-title">{{ displayNameOf(me) }}</h2>
           <p class="helper-text">姓名：{{ me.name }}</p>
@@ -33,6 +37,12 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
 
       <div class="card-stack">
         <p class="card-title">個人資料</p>
+
+        <app-avatar-picker
+          [member]="me"
+          [choice]="avatarChoice"
+          (choiceChange)="onAvatarChoiceChange($event)"
+        />
 
         <div>
           <label class="field-label">顯示暱稱</label>
@@ -45,7 +55,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
 
         <div>
           <label class="field-label">代表色</label>
-          <p class="helper-text mb-2">用於標籤與分攤顯示，頭像為固定 Q 版造型</p>
+          <p class="helper-text mb-2">用於標籤與分攤顯示</p>
 
           <div class="theme-swatch-grid">
             <button
@@ -143,7 +153,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         [open]="saveDialogOpen"
         title="儲存設定"
         [detail]="displayNameOf(me)"
-        message="確定要儲存個人資料與主題設定嗎？"
+        message="確定要儲存個人資料、頭像與主題設定嗎？"
         confirmLabel="確認儲存"
         cancelLabel="取消"
         [busy]="saving"
@@ -176,6 +186,9 @@ export class SettingsComponent implements OnDestroy {
   isError = false;
   saving = false;
   saveDialogOpen = false;
+  avatarChoice: AvatarChoice = { type: 'svg', svgId: 'chibi-1' };
+  previewMember: DisplayMember | null = null;
+  private loadedMemberId: string | null = null;
 
   constructor(
     public auth: AuthService,
@@ -209,6 +222,11 @@ export class SettingsComponent implements OnDestroy {
     this.themePresetId = id;
   }
 
+  onAvatarChoiceChange(choice: AvatarChoice): void {
+    this.avatarChoice = choice;
+    this.syncPreviewMember();
+  }
+
   ngOnDestroy(): void {
     this.themeService.applyForMember(this.auth.currentMember);
   }
@@ -216,11 +234,32 @@ export class SettingsComponent implements OnDestroy {
   private loadFromCurrent(): void {
     const me = this.auth.currentMember;
     if (!me) return;
+
+    const memberChanged = this.loadedMemberId !== me.id;
+    if (memberChanged) {
+      this.loadedMemberId = me.id;
+      this.avatarChoice = { ...resolveAvatarChoice(me.id, me.avatarChoice) };
+    }
+
     this.nickname = me.nickname;
     this.emoji = me.emoji;
     this.color = me.color;
     this.themePresetId = normalizeThemePresetId(me.themePresetId);
     this.themeService.applyForMember(me);
+    this.syncPreviewMember();
+  }
+
+  private syncPreviewMember(): void {
+    const me = this.auth.currentMember;
+    if (!me) {
+      this.previewMember = null;
+      return;
+    }
+
+    this.previewMember = {
+      ...me,
+      avatarChoice: { ...this.avatarChoice },
+    };
   }
 
   openSaveDialog(): void {
@@ -258,6 +297,7 @@ export class SettingsComponent implements OnDestroy {
       nickname: this.nickname.trim(),
       color: this.color,
       themePresetId: this.themePresetId,
+      avatarChoice: this.sanitizeAvatarChoice(me),
     };
 
     if (this.newPassword) {
@@ -304,10 +344,27 @@ export class SettingsComponent implements OnDestroy {
     this.message = '設定已成功儲存';
     this.isError = false;
     this.saveDialogOpen = false;
+
+    const saved = this.auth.getMember(me.id);
+    if (saved) {
+      this.avatarChoice = { ...resolveAvatarChoice(saved.id, saved.avatarChoice) };
+      this.syncPreviewMember();
+    }
   }
 
   async logout(): Promise<void> {
     await this.auth.logout();
     this.router.navigateByUrl('/login');
+  }
+
+  private sanitizeAvatarChoice(me: NonNullable<typeof this.auth.currentMember>) {
+    const choice = resolveAvatarChoice(me.id, this.avatarChoice);
+    if (choice.type === 'slot') {
+      const key = String(choice.slot) as '1' | '2' | '3';
+      if (!me.avatarSlots[key]) {
+        return resolveAvatarChoice(me.id, me.avatarChoice);
+      }
+    }
+    return choice;
   }
 }

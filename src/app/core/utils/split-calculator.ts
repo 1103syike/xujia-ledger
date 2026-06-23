@@ -1,8 +1,8 @@
 import {
-  CreateExpenseInput,
-  ExpenseLineItem,
-  ExpenseSplit,
+  CreateAdvanceInput,
+  LineItem,
   Member,
+  TransactionParticipant,
 } from '../models';
 
 export interface SplitPreviewLine {
@@ -55,7 +55,6 @@ function pickRemainderBearer(
   return candidates[index];
 }
 
-/** 在指定成員中平分（不含被排除者） */
 export function calculateEqualSplitAmong(
   totalAmount: number,
   payingIds: string[],
@@ -156,7 +155,7 @@ export function calculateItemizedSplit(
 }
 
 export function buildSplitPreview(
-  input: CreateExpenseInput,
+  input: CreateAdvanceInput,
   members: Member[]
 ): SplitPreview {
   const allParticipantIds =
@@ -183,57 +182,39 @@ export function buildSplitPreview(
   );
 }
 
-/** 編輯帳款時，若成員與金額未變則保留付款狀態 */
-export function mergeSplitsPreservingPayment(
-  existing: ExpenseSplit[],
-  incoming: ExpenseSplit[]
-): ExpenseSplit[] {
-  const byMember = new Map(existing.map((s) => [s.memberId, s]));
-
-  return incoming.map((split) => {
-    const prev = byMember.get(split.memberId);
-    if (!prev || prev.amount !== split.amount || prev.paymentStatus === 'unpaid') {
-      return split;
-    }
-    return {
-      ...split,
-      paymentStatus: prev.paymentStatus,
-      markedAt: prev.markedAt ?? null,
-      confirmedAt: prev.confirmedAt ?? null,
-    };
-  });
-}
-
-export function previewToSplits(
+export function previewToParticipants(
   preview: SplitPreview,
+  payerId: string,
   splitNotes?: Record<string, string | null>,
-  splitItems?: Record<string, ExpenseLineItem[]>
-): ExpenseSplit[] {
+  splitItems?: Record<string, LineItem[]>
+): TransactionParticipant[] {
   return preview.lines.map((line) => {
     const items = splitItems?.[line.memberId];
-    const split: ExpenseSplit = {
+    const participant: TransactionParticipant = {
       memberId: line.memberId,
       amount: line.amount,
+      signedAmount: line.memberId === payerId ? line.amount : -line.amount,
+      role: line.memberId === payerId ? 'payer' : 'beneficiary',
       note: splitNotes?.[line.memberId] ?? null,
-      paymentStatus: 'unpaid',
-      markedAt: null,
-      confirmedAt: null,
     };
 
     if (items?.length) {
-      split.items = items;
+      participant.lineItems = items;
     }
     if (line.isRemainderBearer && line.remainderAmount > 0) {
-      split.isRemainderBearer = true;
-      split.remainderAmount = line.remainderAmount;
+      participant.isRemainderBearer = true;
+      participant.remainderAmount = line.remainderAmount;
     }
 
-    return split;
+    return participant;
   });
 }
 
+/** @deprecated 使用 previewToParticipants */
+export const previewToSplits = previewToParticipants;
+
 export function validateCreateInput(
-  input: CreateExpenseInput,
+  input: CreateAdvanceInput,
   members: Member[]
 ): string | null {
   if (!input.title.trim()) {
@@ -286,5 +267,22 @@ export function validateCreateInput(
     }
   }
 
+  return null;
+}
+
+export function validateRepaymentInput(
+  fromMemberId: string,
+  toMemberId: string,
+  amount: number
+): string | null {
+  if (!fromMemberId || !toMemberId) {
+    return '請選擇還款對象';
+  }
+  if (fromMemberId === toMemberId) {
+    return '還款對象不能是自己';
+  }
+  if (amount <= 0) {
+    return '還款金額必須大於 0';
+  }
   return null;
 }

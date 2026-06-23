@@ -1,18 +1,35 @@
 export type ParticipantScope = 'all' | 'specific';
 export type SplitMode = 'equal' | 'itemized';
-export type ExpenseStatus = 'open' | 'cancelled';
-export type PaymentStatus = 'unpaid' | 'marked' | 'confirmed';
+export type TransactionType = 'advance' | 'repayment' | 'adjustment' | 'transfer';
+export type TransactionStatus = 'active' | 'void';
 
-export type { DisplayMember, MemberColorOption, MemberProfile, ThemeColors, ThemePreset, ThemePresetId } from './member-profile';
+export type {
+  AvatarChoice,
+  AvatarSlotId,
+  AvatarSlotTimestamps,
+  ChibiId,
+  DisplayMember,
+  MemberColorOption,
+  MemberProfile,
+  ThemeColors,
+  ThemePreset,
+  ThemePresetId,
+} from './member-profile';
 export {
+  AVATAR_SLOT_IDS,
+  CHIBI_IDS,
   DEFAULT_THEME,
   DEFAULT_THEME_PRESET_ID,
+  defaultAvatarChoice,
+  defaultChibiForMember,
   displayNameOf,
+  effectiveChibiId,
   FIREBASE_INTERNAL_PASSWORD,
   getThemePreset,
   memberColorLabel,
   MEMBER_COLOR_OPTIONS,
   normalizeThemePresetId,
+  resolveAvatarChoice,
   resolveThemeColors,
   THEME_PRESETS,
 } from './member-profile';
@@ -25,43 +42,47 @@ export interface Member {
   loginEmail: string;
 }
 
-export interface ExpenseLineItem {
+export interface LineItem {
   note: string;
   amount: number;
 }
 
-export interface ExpenseSplit {
+export interface TransactionParticipant {
   memberId: string;
+  /** 分攤金額（代墊時 ≥ 0） */
   amount: number;
-  items?: ExpenseLineItem[];
+  signedAmount?: number;
+  role?: 'payer' | 'beneficiary';
+  lineItems?: LineItem[];
   note?: string | null;
-  paymentStatus: PaymentStatus;
   isRemainderBearer?: boolean;
   remainderAmount?: number;
-  markedAt?: string | null;
-  confirmedAt?: string | null;
 }
 
-export interface Expense {
+export interface Transaction {
   id: string;
+  accountId: string;
+  type: TransactionType;
   title: string;
-  /** 帳款日期 YYYY-MM-DD（本地） */
+  /** 交易日期 YYYY-MM-DD（本地） */
   date?: string;
   totalAmount: number;
   billTotal?: number | null;
+  /** 代墊者（advance）或還款收款人（repayment） */
   payerId: string;
-  participantScope: ParticipantScope;
-  participantIds: string[];
-  splitMode: SplitMode;
+  /** 還款付款人（repayment only） */
+  fromMemberId?: string | null;
+  participantScope?: ParticipantScope;
+  participantIds?: string[];
+  splitMode?: SplitMode;
   note?: string | null;
-  lineItems?: ExpenseLineItem[];
   remainderBearerId?: string | null;
   remainderAmount?: number;
-  status: ExpenseStatus;
+  status: TransactionStatus;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
-  splits: ExpenseSplit[];
+  participants: TransactionParticipant[];
 }
 
 export interface AuditLog {
@@ -80,7 +101,13 @@ export interface BalanceEdge {
   amount: number;
 }
 
-export interface CreateExpenseInput {
+export interface SettlementEntry {
+  otherId: string;
+  direction: 'owe' | 'owed';
+  amount: number;
+}
+
+export interface CreateAdvanceInput {
   title: string;
   date: string;
   totalAmount: number;
@@ -90,12 +117,34 @@ export interface CreateExpenseInput {
   participantIds: string[];
   splitMode: SplitMode;
   note?: string | null;
-  splitItems?: Record<string, ExpenseLineItem[]>;
+  splitItems?: Record<string, LineItem[]>;
   manualAmounts?: Record<string, number>;
   splitNotes?: Record<string, string | null>;
   excludedMemberIds?: string[];
   remainderSeed?: string;
 }
+
+export interface CreateRepaymentInput {
+  fromMemberId: string;
+  toMemberId: string;
+  amount: number;
+  date: string;
+  note?: string | null;
+}
+
+/** @deprecated 使用 CreateAdvanceInput */
+export type CreateExpenseInput = CreateAdvanceInput;
+
+/** @deprecated 使用 LineItem */
+export type ExpenseLineItem = LineItem;
+
+/** @deprecated 使用 TransactionParticipant */
+export type ExpenseSplit = TransactionParticipant;
+
+/** @deprecated 使用 Transaction */
+export type Expense = Transaction;
+
+export const DEFAULT_ACCOUNT_ID = 'default';
 
 export const DEFAULT_MEMBERS: Member[] = [
   { id: 'm1', name: '林庭郁', emoji: '🌸', color: '#FFB5A7', loginEmail: 'm1@xujia-ledger.app' },

@@ -105,20 +105,20 @@ import { AppLogoComponent } from '../shared/components/app-logo.component';
             <span class="bottom-nav__label">首頁</span>
           </a>
           <a
-            routerLink="/expenses"
+            routerLink="/transactions"
             routerLinkActive="bottom-nav__link--active"
             class="bottom-nav__link"
           >
             <span class="bottom-nav__icon" aria-hidden="true">📝</span>
-            <span class="bottom-nav__label">帳款</span>
+            <span class="bottom-nav__label">交易</span>
           </a>
           <a
-            routerLink="/pending"
+            routerLink="/transactions/new"
             routerLinkActive="bottom-nav__link--active"
             class="bottom-nav__link"
           >
-            <span class="bottom-nav__icon" aria-hidden="true">✨</span>
-            <span class="bottom-nav__label">待確認</span>
+            <span class="bottom-nav__icon" aria-hidden="true">➕</span>
+            <span class="bottom-nav__label">新增</span>
           </a>
           <a
             routerLink="/audit"

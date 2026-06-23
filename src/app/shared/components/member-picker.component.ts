@@ -22,10 +22,16 @@ import { MemberAvatarComponent } from './member-avatar.component';
       (click)="open()"
       [attr.aria-expanded]="isOpen"
       aria-haspopup="listbox"
+      [disabled]="pickerDisabled"
     >
       <ng-container *ngIf="selected; else empty">
         <app-member-avatar [member]="selected" size="md" />
-        <span class="item-title flex-1">{{ selected.name }}</span>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <span class="item-title">{{ selected.name }}</span>
+          <span *ngIf="selectedOweLabel" class="caption-text text-coral">
+            {{ selectedOweLabel }}
+          </span>
+        </div>
       </ng-container>
       <ng-template #empty>
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-ink/30">
@@ -81,18 +87,39 @@ import { MemberAvatarComponent } from './member-avatar.component';
         </div>
 
         <ul class="max-h-[50vh] stack-sm overflow-y-auto px-3 pb-4" role="listbox">
-          <li *ngFor="let m of members" role="option" [attr.aria-selected]="m.id === value">
+          <li
+            *ngFor="let m of members"
+            role="option"
+            [attr.aria-selected]="m.id === value"
+            [attr.aria-disabled]="!isSelectable(m.id)"
+          >
             <button
               type="button"
-              class="flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-3 text-left transition active:scale-[0.99]"
-              [class.border-peach]="m.id === value"
-              [class.bg-peach-15]="m.id === value"
-              [class.border-transparent]="m.id !== value"
+              class="flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-3 text-left transition"
+              [class.border-peach]="m.id === value && isSelectable(m.id)"
+              [class.bg-peach-15]="m.id === value && isSelectable(m.id)"
+              [class.border-transparent]="m.id !== value || !isSelectable(m.id)"
+              [class.cursor-not-allowed]="!isSelectable(m.id)"
+              [class.active:scale-[0.99]]="isSelectable(m.id)"
+              [disabled]="!isSelectable(m.id)"
               (click)="pick(m.id)"
             >
-              <app-member-avatar [member]="m" size="md" />
-              <span class="item-title min-w-0 flex-1">{{ m.name }}</span>
+              <div
+                class="flex min-w-0 flex-1 items-center gap-3"
+                [class.opacity-50]="!isSelectable(m.id)"
+              >
+                <app-member-avatar [member]="m" size="md" />
+                <span class="item-title min-w-0 flex-1">{{ m.name }}</span>
+              </div>
               <span
+                *ngIf="memberSubtitle(m.id) as sub"
+                class="shrink-0 text-sm font-medium"
+                [ngClass]="amountClass(m.id)"
+              >
+                {{ sub }}
+              </span>
+              <span
+                *ngIf="isSelectable(m.id)"
                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs"
                 [class.bg-peach]="m.id === value"
                 [class.text-white]="m.id === value"
@@ -110,6 +137,8 @@ export class MemberPickerComponent {
   @Input({ required: true }) label = '選擇成員';
   @Input({ required: true }) members: Member[] = [];
   @Input() value = '';
+  /** 正數＝欠對方；負數＝對方欠你；0＝已結清。有值時僅正數可選 */
+  @Input() oweAmounts: Record<string, number> | null = null;
   @Output() valueChange = new EventEmitter<string>();
 
   isOpen = false;
@@ -118,12 +147,45 @@ export class MemberPickerComponent {
     return this.members.find((m) => m.id === this.value);
   }
 
+  get pickerDisabled(): boolean {
+    if (!this.oweAmounts) return false;
+    return !this.members.some((m) => this.isSelectable(m.id));
+  }
+
+  get selectedOweLabel(): string | null {
+    if (!this.oweAmounts || !this.value) return null;
+    const owe = this.oweAmounts[this.value] ?? 0;
+    return owe > 0 ? `欠 NT$ ${owe}` : null;
+  }
+
+  isSelectable(memberId: string): boolean {
+    if (!this.oweAmounts) return true;
+    return (this.oweAmounts[memberId] ?? 0) > 0;
+  }
+
+  memberSubtitle(memberId: string): string | null {
+    if (!this.oweAmounts) return null;
+    const owe = this.oweAmounts[memberId] ?? 0;
+    if (owe > 0) return `欠 NT$ ${owe}`;
+    if (owe < 0) return `他欠你 NT$ ${-owe}`;
+    return '已結清';
+  }
+
+  amountClass(memberId: string): string {
+    if (!this.oweAmounts) return '';
+    const owe = this.oweAmounts[memberId] ?? 0;
+    if (owe > 0) return 'text-coral';
+    if (owe < 0) return 'text-positive';
+    return 'caption-text';
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.close();
   }
 
   open(): void {
+    if (this.pickerDisabled) return;
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
   }
@@ -134,6 +196,7 @@ export class MemberPickerComponent {
   }
 
   pick(id: string): void {
+    if (!this.isSelectable(id)) return;
     this.valueChange.emit(id);
     this.close();
   }

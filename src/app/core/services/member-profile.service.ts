@@ -14,8 +14,11 @@ import { firestoreDb } from '../firebase';
 import {
   DEFAULT_MEMBERS,
   DEFAULT_THEME_PRESET_ID,
+  AvatarChoice,
+  AvatarSlotId,
   DisplayMember,
   MemberProfile,
+  resolveAvatarChoice,
   resolveThemeColors,
   ThemePresetId,
 } from '../models';
@@ -95,7 +98,12 @@ export class MemberProfileService implements OnDestroy {
     patch: Partial<
       Pick<
         MemberProfile,
-        'nickname' | 'emoji' | 'color' | 'loginPassword' | 'themePresetId'
+        | 'nickname'
+        | 'emoji'
+        | 'color'
+        | 'loginPassword'
+        | 'themePresetId'
+        | 'avatarChoice'
       >
     >
   ): Promise<string | null> {
@@ -108,6 +116,24 @@ export class MemberProfileService implements OnDestroy {
       return null;
     } catch {
       return '儲存失敗，請稍後再試';
+    }
+  }
+
+  async updateAvatarSlot(
+    memberId: string,
+    slot: AvatarSlotId,
+    timestamp: string | null
+  ): Promise<string | null> {
+    try {
+      const key = String(slot) as '1' | '2' | '3';
+      const payload: UpdateData<MemberProfile> =
+        timestamp != null
+          ? { [`avatarSlots.${key}`]: timestamp }
+          : { [`avatarSlots.${key}`]: deleteField() };
+      await updateDoc(doc(firestoreDb, 'memberProfiles', memberId), payload);
+      return null;
+    } catch {
+      return '更新頭像槽位失敗';
     }
   }
 
@@ -160,6 +186,8 @@ export class MemberProfileService implements OnDestroy {
       loginEmail: base.loginEmail,
       themePresetId: profile.themePresetId ?? DEFAULT_THEME_PRESET_ID,
       theme,
+      avatarChoice: resolveAvatarChoice(base.id, profile.avatarChoice),
+      avatarSlots: { ...(profile.avatarSlots ?? {}) },
     };
   }
 }

@@ -1,5 +1,5 @@
 import { AuditLog } from '../models';
-import { formatExpenseDateLabel } from './expense-date';
+import { formatTransactionDateLabel } from './transaction-date';
 
 export interface AuditDisplay {
   title: string;
@@ -14,125 +14,75 @@ export function formatAuditLog(
   const actor = memberName(log.actorId) ?? log.actorId;
 
   switch (log.action) {
+    case 'transaction.advance.created':
     case 'expense.created': {
       const payer = memberName(String(p['payerId'])) ?? String(p['payerId']);
       const splitMode = p['splitMode'] === 'itemized' ? '細分' : '平分';
-      const lines = [
-        `${actor} 建立了帳款`,
-        `項目：${p['title']}`,
-      ];
+      const lines = [`${actor} 建立了代墊`, `項目：${p['title']}`];
       if (p['date']) {
-        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
+        lines.push(`日期：${formatTransactionDateLabel(String(p['date']))}`);
       }
       lines.push(
         `總額 NT$ ${p['totalAmount']}`,
-        `代墊者：${payer} · ${splitMode}`,
+        `代墊者：${payer} · ${splitMode}`
       );
-      const splits = p['splits'] as
-        | Array<{ name: string; amount: number; items?: Array<{ note: string; amount: number }> }>
+      const participants = (p['participants'] ?? p['splits']) as
+        | Array<{ name: string; amount: number; lineItems?: Array<{ note: string; amount: number }>; items?: Array<{ note: string; amount: number }> }>
         | undefined;
-      if (splits?.length) {
-        const detail = splits
+      if (participants?.length) {
+        const detail = participants
           .filter((s) => s.amount > 0)
           .map((s) => {
-            if (s.items?.length) {
-              const items = s.items.map((i) => `${i.note} ${i.amount}`).join('、');
-              return `${s.name}：${items}`;
+            const items = s.lineItems ?? s.items;
+            if (items?.length) {
+              const itemStr = items.map((i) => `${i.note} ${i.amount}`).join('、');
+              return `${s.name}：${itemStr}`;
             }
             return `${s.name} NT$ ${s.amount}`;
           })
           .join('；');
         if (detail) lines.push(`分攤明細：${detail}`);
       }
-      return { title: '建立帳款', lines };
+      return { title: '建立代墊', lines };
+    }
+    case 'transaction.repayment.created': {
+      const from = memberName(String(p['fromMemberId'])) ?? String(p['fromMemberId']);
+      const to = memberName(String(p['toMemberId'])) ?? String(p['toMemberId']);
+      const lines = [
+        `${actor} 建立了還款`,
+        `${from} → ${to}`,
+        `金額 NT$ ${p['amount']}`,
+      ];
+      if (p['date']) {
+        lines.push(`日期：${formatTransactionDateLabel(String(p['date']))}`);
+      }
+      return { title: '建立還款', lines };
+    }
+    case 'transaction.voided':
+    case 'expense.cancelled': {
+      const lines = [`${actor} 作廢了交易`];
+      if (p['title']) lines.push(`項目：${p['title']}`);
+      if (p['totalAmount'] != null) lines.push(`原金額 NT$ ${p['totalAmount']}`);
+      return { title: '作廢交易', lines };
     }
     case 'expense.updated': {
       const payer = memberName(String(p['payerId'])) ?? String(p['payerId']);
-      const splitMode = p['splitMode'] === 'itemized' ? '細分' : '平分';
       const lines = [
-        `${actor} 編輯了帳款`,
+        `${actor} 編輯了帳款（舊紀錄）`,
         `項目：${p['title']}`,
-      ];
-      if (p['date']) {
-        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
-      }
-      lines.push(
         `總額 NT$ ${p['totalAmount']}`,
-        `代墊者：${payer} · ${splitMode}`,
-      );
-      if (
-        p['previousTitle'] &&
-        p['previousTitle'] !== p['title']
-      ) {
-        lines.push(`原項目：${p['previousTitle']}`);
-      }
-      if (
-        p['previousDate'] &&
-        p['previousDate'] !== p['date']
-      ) {
-        lines.push(
-          `原日期：${formatExpenseDateLabel(String(p['previousDate']))}`
-        );
-      }
-      if (
-        p['previousTotalAmount'] != null &&
-        p['previousTotalAmount'] !== p['totalAmount']
-      ) {
-        lines.push(`原總額 NT$ ${p['previousTotalAmount']}`);
-      }
-      const splits = p['splits'] as
-        | Array<{ name: string; amount: number; items?: Array<{ note: string; amount: number }> }>
-        | undefined;
-      if (splits?.length) {
-        const detail = splits
-          .filter((s) => s.amount > 0)
-          .map((s) => {
-            if (s.items?.length) {
-              const items = s.items.map((i) => `${i.note} ${i.amount}`).join('、');
-              return `${s.name}：${items}`;
-            }
-            return `${s.name} NT$ ${s.amount}`;
-          })
-          .join('；');
-        if (detail) lines.push(`分攤明細：${detail}`);
-      }
+        `代墊者：${payer}`,
+      ];
       return { title: '編輯帳款', lines };
     }
-    case 'expense.cancelled': {
-      const lines = [`${actor} 移除了帳款`];
-      if (p['title']) lines.push(`項目：${p['title']}`);
-      if (p['date']) {
-        lines.push(`日期：${formatExpenseDateLabel(String(p['date']))}`);
-      }
-      if (p['totalAmount'] != null) lines.push(`原總額 NT$ ${p['totalAmount']}`);
-      return { title: '移除帳款', lines };
-    }
-    case 'payment.marked': {
-      const debtor = memberName(String(p['debtorId'])) ?? String(p['debtorId']);
-      const lines = [
-        `${debtor} 標記已付款`,
-        `項目：${p['title'] ?? '—'}`,
-        `金額 NT$ ${p['amount'] ?? '—'}`,
-      ];
-      return { title: '標記付款', lines };
-    }
-    case 'payment.confirmed': {
-      const debtor = memberName(String(p['debtorId'])) ?? String(p['debtorId']);
-      const lines = [
-        `${actor} 確認了 ${debtor} 的付款`,
-        `項目：${p['title'] ?? '—'}`,
-        `金額 NT$ ${p['amount'] ?? '—'}`,
-      ];
-      return { title: '確認收款', lines };
-    }
+    case 'payment.marked':
+    case 'payment.confirmed':
     case 'payment.unconfirmed': {
       const debtor = memberName(String(p['debtorId'])) ?? String(p['debtorId']);
-      const lines = [
-        `${actor} 撤銷了 ${debtor} 的收款確認`,
-        `項目：${p['title'] ?? '—'}`,
-        `金額 NT$ ${p['amount'] ?? '—'}`,
-      ];
-      return { title: '撤銷確認', lines };
+      return {
+        title: '舊版付款紀錄',
+        lines: [`${actor} / ${debtor} · ${log.action}`, `項目：${p['title'] ?? '—'}`],
+      };
     }
     default:
       return { title: log.action, lines: [actor] };

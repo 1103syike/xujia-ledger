@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** 成員信箱固定為 m1~m5@xujia-ledger.app，與 memberId 一一對應 */
+    function emailMemberId() {
+      let email = request.auth.token.email;
+      return email == 'm1@xujia-ledger.app' ? 'm1' :
+             email == 'm2@xujia-ledger.app' ? 'm2' :
+             email == 'm3@xujia-ledger.app' ? 'm3' :
+             email == 'm4@xujia-ledger.app' ? 'm4' :
+             email == 'm5@xujia-ledger.app' ? 'm5' : null;
+    }
+
+    function isMember() {
+      return isSignedIn() && emailMemberId() != null;
+    }
+
+    function isSelf(memberId) {
+      return isMember() && emailMemberId() == memberId;
+    }
+
+    function isValidAvatarFile(fileName) {
+      return fileName.matches('slot-[1-3]\\.webp')
+        && request.resource.size < 1024 * 1024;
+    }
+
+    match /avatars/{memberId}/{fileName} {
+      allow read: if isMember();
+      allow create, update: if isSelf(memberId) && isValidAvatarFile(fileName);
+      allow delete: if isSelf(memberId) && fileName.matches('slot-[1-3]\\.webp');
+    }
+  }
+}

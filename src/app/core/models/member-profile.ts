@@ -200,6 +200,66 @@ export function resolveThemeColors(
   return { ...presetColors };
 }
 
+export type AvatarSlotId = 1 | 2 | 3;
+export type ChibiId =
+  | 'chibi-1'
+  | 'chibi-2'
+  | 'chibi-3'
+  | 'chibi-4'
+  | 'chibi-5'
+  | 'chibi-6';
+
+export type AvatarChoice =
+  | { type: 'slot'; slot: AvatarSlotId }
+  | { type: 'svg'; svgId: ChibiId };
+
+export type AvatarSlotTimestamps = Partial<Record<'1' | '2' | '3', string>>;
+
+export const CHIBI_IDS: ChibiId[] = [
+  'chibi-1',
+  'chibi-2',
+  'chibi-3',
+  'chibi-4',
+  'chibi-5',
+  'chibi-6',
+];
+
+export const AVATAR_SLOT_IDS: AvatarSlotId[] = [1, 2, 3];
+
+const DEFAULT_CHIBI_BY_MEMBER: Record<string, ChibiId> = {
+  m1: 'chibi-1',
+  m2: 'chibi-2',
+  m3: 'chibi-3',
+  m4: 'chibi-4',
+  m5: 'chibi-5',
+};
+
+export function defaultChibiForMember(memberId: string): ChibiId {
+  return DEFAULT_CHIBI_BY_MEMBER[memberId] ?? 'chibi-1';
+}
+
+export function defaultAvatarChoice(memberId: string): AvatarChoice {
+  return { type: 'svg', svgId: defaultChibiForMember(memberId) };
+}
+
+export function resolveAvatarChoice(
+  memberId: string,
+  choice?: AvatarChoice | null
+): AvatarChoice {
+  if (!choice) return defaultAvatarChoice(memberId);
+  if (choice.type === 'svg' && CHIBI_IDS.includes(choice.svgId)) return choice;
+  if (choice.type === 'slot' && AVATAR_SLOT_IDS.includes(choice.slot)) return choice;
+  return defaultAvatarChoice(memberId);
+}
+
+export function effectiveChibiId(
+  memberId: string,
+  choice: AvatarChoice
+): ChibiId {
+  if (choice.type === 'svg') return choice.svgId;
+  return defaultChibiForMember(memberId);
+}
+
 export interface MemberProfile {
   memberId: string;
   name: string;
@@ -209,6 +269,8 @@ export interface MemberProfile {
   loginPassword: string;
   themePresetId: ThemePresetId;
   theme?: ThemeColors;
+  avatarChoice?: AvatarChoice;
+  avatarSlots?: AvatarSlotTimestamps;
 }
 
 export interface DisplayMember {
@@ -220,6 +282,8 @@ export interface DisplayMember {
   loginEmail: string;
   themePresetId: ThemePresetId;
   theme: ThemeColors;
+  avatarChoice: AvatarChoice;
+  avatarSlots: AvatarSlotTimestamps;
 }
 
 export function displayNameOf(member: Pick<DisplayMember, 'nickname' | 'name'>): string {

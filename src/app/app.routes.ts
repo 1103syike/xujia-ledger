@@ -22,39 +22,31 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'expenses',
+        path: 'transactions',
         loadComponent: () =>
-          import('./features/expenses/expense-list.component').then(
-            (m) => m.ExpenseListComponent
+          import('./features/transactions/transaction-list.component').then(
+            (m) => m.TransactionListComponent
           ),
       },
       {
-        path: 'expenses/new',
+        path: 'transactions/new',
         loadComponent: () =>
-          import('./features/expenses/expense-create.component').then(
-            (m) => m.ExpenseCreateComponent
+          import('./features/transactions/transaction-create.component').then(
+            (m) => m.TransactionCreateComponent
           ),
       },
       {
-        path: 'expenses/:id/edit',
+        path: 'transactions/:id',
         loadComponent: () =>
-          import('./features/expenses/expense-create.component').then(
-            (m) => m.ExpenseCreateComponent
-          ),
-        data: { edit: true },
-      },
-      {
-        path: 'expenses/:id',
-        loadComponent: () =>
-          import('./features/expenses/expense-detail.component').then(
-            (m) => m.ExpenseDetailComponent
+          import('./features/transactions/transaction-detail.component').then(
+            (m) => m.TransactionDetailComponent
           ),
       },
       {
-        path: 'pending',
+        path: 'members/:id',
         loadComponent: () =>
-          import('./features/pending/pending.component').then(
-            (m) => m.PendingComponent
+          import('./features/members/member-ledger.component').then(
+            (m) => m.MemberLedgerComponent
           ),
       },
       {
@@ -71,6 +63,11 @@ export const routes: Routes = [
             (m) => m.SettingsComponent
           ),
       },
+      { path: 'expenses', redirectTo: 'transactions', pathMatch: 'full' },
+      { path: 'expenses/new', redirectTo: 'transactions/new', pathMatch: 'full' },
+      { path: 'expenses/:id', redirectTo: 'transactions/:id' },
+      { path: 'expenses/:id/edit', redirectTo: 'transactions/:id' },
+      { path: 'pending', redirectTo: '' },
     ],
   },
   { path: '**', redirectTo: '' },

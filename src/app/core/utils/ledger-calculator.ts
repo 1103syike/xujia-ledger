@@ -1,0 +1,217 @@
+import { BalanceEdge, SettlementEntry, Transaction } from '../models';
+
+function edgeKey(from: string, to: string): string {
+  return `${from}->${to}`;
+}
+
+function addEdge(
+  matrix: Map<string, number>,
+  from: string,
+  to: string,
+  amount: number
+): void {
+  if (from === to || amount === 0) return;
+  const key = edgeKey(from, to);
+  matrix.set(key, (matrix.get(key) ?? 0) + amount);
+}
+
+/** 原始 pairwise 欠款（未軋差） */
+export function computeBalances(transactions: Transaction[]): BalanceEdge[] {
+  const matrix = new Map<string, number>();
+
+  for (const tx of transactions) {
+    if (tx.status !== 'active') continue;
+
+    if (tx.type === 'advance') {
+      for (const p of tx.participants) {
+        if (p.memberId === tx.payerId) continue;
+        if (p.amount <= 0) continue;
+        addEdge(matrix, p.memberId, tx.payerId, p.amount);
+      }
+    } else if (tx.type === 'repayment') {
+      const from = tx.fromMemberId ?? tx.payerId;
+      const to = tx.payerId;
+      if (from && to && tx.totalAmount > 0) {
+        addEdge(matrix, from, to, -tx.totalAmount);
+      }
+    }
+  }
+
+  const edges: BalanceEdge[] = [];
+  matrix.forEach((amount, key) => {
+    if (amount === 0) return;
+    const [fromId, toId] = key.split('->');
+    if (amount > 0) {
+      edges.push({ fromId, toId, amount });
+    } else {
+      edges.push({ fromId: toId, toId: fromId, amount: -amount });
+    }
+  });
+
+  return edges.sort((a, b) => b.amount - a.amount);
+}
+
+export function netBalances(transactions: Transaction[]): BalanceEdge[] {
+  const raw = computeBalances(transactions);
+  const pairKey = (a: string, b: string) => [a, b].sort().join('|');
+  const pairs = new Map<string, { a: string; b: string; ab: number; ba: number }>();
+
+  for (const edge of raw) {
+    const pk = pairKey(edge.fromId, edge.toId);
+    const entry = pairs.get(pk) ?? {
+      a: edge.fromId,
+      b: edge.toId,
+      ab: 0,
+      ba: 0,
+    };
+    if (edge.fromId === entry.a) {
+      entry.ab += edge.amount;
+    } else {
+      entry.ba += edge.amount;
+    }
+    pairs.set(pk, entry);
+  }
+
+  const result: BalanceEdge[] = [];
+  pairs.forEach(({ a, b, ab, ba }) => {
+    if (ab > ba) {
+      result.push({ fromId: a, toId: b, amount: ab - ba });
+    } else if (ba > ab) {
+      result.push({ fromId: b, toId: a, amount: ba - ab });
+    }
+  });
+
+  return result.sort((x, y) => y.amount - x.amount);
+}
+
+/**  viewer 視角：與各成員的結算 */
+export function settlementsForMember(
+  transactions: Transaction[],
+  viewerId: string
+): SettlementEntry[] {
+  return netBalances(transactions)
+    .filter((e) => e.fromId === viewerId || e.toId === viewerId)
+    .map((e) => {
+      if (e.fromId === viewerId) {
+        return { otherId: e.toId, direction: 'owe' as const, amount: e.amount };
+      }
+      return { otherId: e.fromId, direction: 'owed' as const, amount: e.amount };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/** viewer 欠 other 的淨額（正數表示 viewer 欠 other） */
+export function amountViewerOwesOther(
+  transactions: Transaction[],
+  viewerId: string,
+  otherId: string
+): number {
+  const edge = netBalances(transactions).find(
+    (e) =>
+      (e.fromId === viewerId && e.toId === otherId) ||
+      (e.fromId === otherId && e.toId === viewerId)
+  );
+  if (!edge) return 0;
+  if (edge.fromId === viewerId) return edge.amount;
+  return -edge.amount;
+}
+
+/** 與指定成員的 pairwise 結算（fromId 欠 toId） */
+export function pairwiseSettlement(
+  transactions: Transaction[],
+  memberA: string,
+  memberB: string
+): BalanceEdge | null {
+  const edge = netBalances(transactions).find(
+    (e) =>
+      (e.fromId === memberA && e.toId === memberB) ||
+      (e.fromId === memberB && e.toId === memberA)
+  );
+  return edge ?? null;
+}
+
+/** 交易是否涉及指定成員 */
+export function transactionInvolvesMember(
+  tx: Transaction,
+  memberId: string
+): boolean {
+  if (tx.status !== 'active') return false;
+  if (tx.type === 'repayment') {
+    const from = tx.fromMemberId ?? '';
+    return from === memberId || tx.payerId === memberId;
+  }
+  if (tx.payerId === memberId) return true;
+  return tx.participants.some((p) => p.memberId === memberId && p.amount > 0);
+}
+
+/** 交易是否影響兩人 pairwise 結算（代墊＋分攤，或還款） */
+export function transactionAffectsPair(
+  tx: Transaction,
+  memberA: string,
+  memberB: string
+): boolean {
+  if (tx.status !== 'active' || memberA === memberB) return false;
+
+  if (tx.type === 'repayment') {
+    const from = tx.fromMemberId ?? '';
+    return (
+      (from === memberA && tx.payerId === memberB) ||
+      (from === memberB && tx.payerId === memberA)
+    );
+  }
+
+  if (tx.type === 'advance') {
+    const splitOf = (id: string) =>
+      tx.participants.find((p) => p.memberId === id)?.amount ?? 0;
+    return (
+      (tx.payerId === memberA && splitOf(memberB) > 0) ||
+      (tx.payerId === memberB && splitOf(memberA) > 0)
+    );
+  }
+
+  return false;
+}
+
+/** 兩人之間的相關交易（須同時影響雙方結算） */
+export function transactionsBetweenMembers(
+  transactions: Transaction[],
+  memberA: string,
+  memberB: string
+): Transaction[] {
+  return transactions.filter((tx) =>
+    transactionAffectsPair(tx, memberA, memberB)
+  );
+}
+
+/** @deprecated 使用 transactionsBetweenMembers */
+export function transactionsForMember(
+  transactions: Transaction[],
+  memberId: string
+): Transaction[] {
+  return transactions.filter((tx) => transactionInvolvesMember(tx, memberId));
+}
+
+/** 交易對 memberId 的 signed 影響（正=應收回，負=應付） */
+export function signedImpactOnMember(
+  tx: Transaction,
+  memberId: string
+): number {
+  if (tx.status !== 'active') return 0;
+
+  if (tx.type === 'repayment') {
+    const from = tx.fromMemberId ?? '';
+    if (from === memberId) return -tx.totalAmount;
+    if (tx.payerId === memberId) return tx.totalAmount;
+    return 0;
+  }
+
+  if (tx.type === 'advance') {
+    if (tx.payerId === memberId) {
+      return tx.totalAmount;
+    }
+    const p = tx.participants.find((x) => x.memberId === memberId);
+    return p ? -p.amount : 0;
+  }
+
+  return 0;
+}

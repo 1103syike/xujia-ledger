@@ -1,5 +1,5 @@
-import { Expense } from '../models';
-import { computeBalances, netBalances } from './balance-calculator';
+import { Transaction } from '../models';
+import { computeBalances, netBalances } from './ledger-calculator';
 
 export interface DebtRankingEntry {
   memberId: string;
@@ -12,7 +12,7 @@ export interface DebtorEntry {
 }
 
 /** 各成員尚未結清的總負債（加總所有待付分攤） */
-export function totalDebtRanking(expenses: Expense[]): DebtRankingEntry[] {
+export function totalDebtRanking(expenses: Transaction[]): DebtRankingEntry[] {
   const totals = new Map<string, number>();
 
   for (const edge of computeBalances(expenses)) {
@@ -26,7 +26,7 @@ export function totalDebtRanking(expenses: Expense[]): DebtRankingEntry[] {
 
 /** 欠指定成員的淨額（已 net 過雙向） */
 export function debtorsToCreditor(
-  expenses: Expense[],
+  expenses: Transaction[],
   creditorId: string
 ): DebtorEntry[] {
   return netBalances(expenses)

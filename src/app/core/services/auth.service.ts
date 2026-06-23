@@ -38,13 +38,13 @@ export class AuthService {
 
     this.profiles.profiles$.subscribe(() => {
       const current = this.currentMemberSubject.value;
-      if (current) {
-        const refreshed = this.profiles.getDisplayMember(current.id);
-        if (refreshed) {
-          this.currentMemberSubject.next(refreshed);
-          this.theme.applyForMember(refreshed);
-        }
-      }
+      if (!current) return;
+
+      const refreshed = this.profiles.getDisplayMember(current.id);
+      if (!refreshed || this.isSameDisplayMember(current, refreshed)) return;
+
+      this.currentMemberSubject.next(refreshed);
+      this.theme.applyForMember(refreshed);
     });
   }
 
@@ -128,7 +128,35 @@ export class AuthService {
   }
 
   private async resolveMemberId(uid: string): Promise<string | null> {
-    const snap = await getDoc(doc(firestoreDb, 'users', uid));
-    return (snap.data()?.['memberId'] as string | undefined) ?? null;
+    const userRef = doc(firestoreDb, 'users', uid);
+    const snap = await getDoc(userRef);
+    const stored = snap.data()?.['memberId'] as string | undefined;
+    if (stored) return stored;
+
+    const authUser = firebaseAuth.currentUser;
+    const fromEmail = this.memberIdFromEmail(authUser?.email);
+    if (!fromEmail) return null;
+
+    await setDoc(userRef, { memberId: fromEmail }, { merge: true });
+    return fromEmail;
+  }
+
+  private memberIdFromEmail(email?: string | null): string | null {
+    if (!email) return null;
+    const base = this.members.find((m) => m.loginEmail === email);
+    return base?.id ?? null;
+  }
+
+  private isSameDisplayMember(a: DisplayMember, b: DisplayMember): boolean {
+    return (
+      a.id === b.id &&
+      a.name === b.name &&
+      a.nickname === b.nickname &&
+      a.emoji === b.emoji &&
+      a.color === b.color &&
+      a.themePresetId === b.themePresetId &&
+      JSON.stringify(a.avatarChoice) === JSON.stringify(b.avatarChoice) &&
+      JSON.stringify(a.avatarSlots) === JSON.stringify(b.avatarSlots)
+    );
   }
 }
