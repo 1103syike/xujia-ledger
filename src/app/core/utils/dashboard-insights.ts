@@ -1,5 +1,5 @@
 import { Transaction } from '../models';
-import { computeBalances, netBalances } from './ledger-calculator';
+import { netBalances } from './ledger-calculator';
 
 export interface DebtRankingEntry {
   memberId: string;
@@ -11,16 +11,18 @@ export interface DebtorEntry {
   amount: number;
 }
 
-/** 各成員尚未結清的總負債（加總所有待付分攤） */
+/** 各成員淨待結算排行（欠的扣掉應收，取負最多前三名） */
 export function totalDebtRanking(expenses: Transaction[]): DebtRankingEntry[] {
-  const totals = new Map<string, number>();
+  const nets = new Map<string, number>();
 
-  for (const edge of computeBalances(expenses)) {
-    totals.set(edge.fromId, (totals.get(edge.fromId) ?? 0) + edge.amount);
+  for (const edge of netBalances(expenses)) {
+    nets.set(edge.fromId, (nets.get(edge.fromId) ?? 0) - edge.amount);
+    nets.set(edge.toId, (nets.get(edge.toId) ?? 0) + edge.amount);
   }
 
-  return [...totals.entries()]
-    .map(([memberId, total]) => ({ memberId, total }))
+  return [...nets.entries()]
+    .filter(([, net]) => net < 0)
+    .map(([memberId, net]) => ({ memberId, total: -net }))
     .sort((a, b) => b.total - a.total);
 }
 

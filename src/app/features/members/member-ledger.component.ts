@@ -9,6 +9,10 @@ import {
   signedImpactOnMember,
   transactionsBetweenMembers,
 } from '../../core/utils/ledger-calculator';
+import {
+  formatOweAmount,
+  formatOwedAmount,
+} from '../../core/utils/settlement-display';
 import { activeTransactions, transactionTypeLabel } from '../../core/utils/transaction-date';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
@@ -41,12 +45,12 @@ import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
         <div *ngIf="vm.settlement as s" class="mt-2">
           <p class="body-text">
             <ng-container *ngIf="s.fromId === vm.viewerId">
-              你欠 {{ auth.getMember(s.toId)?.name }}
-              <span class="amount-highlight">NT$ {{ s.amount }}</span>
+              待還給 {{ auth.getMember(s.toId)?.name }}
+              <span class="amount-highlight text-debt">{{ formatOweAmount(s.amount) }}</span>
             </ng-container>
             <ng-container *ngIf="s.toId === vm.viewerId">
-              {{ auth.getMember(s.fromId)?.name }} 欠你
-              <span class="amount-highlight">NT$ {{ s.amount }}</span>
+              {{ auth.getMember(s.fromId)?.name }} 待向你還款
+              <span class="amount-highlight text-positive">{{ formatOwedAmount(s.amount) }}</span>
             </ng-container>
           </p>
           <a
@@ -58,7 +62,7 @@ import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
             還款
           </a>
         </div>
-        <p *ngIf="!vm.settlement" class="helper-text mt-2">目前與此人已結清</p>
+        <p *ngIf="!vm.settlement" class="helper-text mt-2">目前與此人沒有待結算款項</p>
       </section>
 
       <section class="section">
@@ -81,8 +85,10 @@ import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
                 <p class="caption-text mt-1">{{ entry.tx | transactionDate }}</p>
               </div>
               <span
-                class="amount-md shrink-0"
-                [class.text-coral]="entry.impact < 0"
+                class="shrink-0"
+                [class.amount-md]="entry.impact !== 0"
+                [class.amount-neutral]="entry.impact === 0"
+                [class.text-debt]="entry.impact < 0"
                 [class.text-positive]="entry.impact > 0"
               >
                 <ng-container *ngIf="entry.impact !== 0">
@@ -98,6 +104,8 @@ import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
   `,
 })
 export class MemberLedgerComponent {
+  formatOweAmount = formatOweAmount;
+  formatOwedAmount = formatOwedAmount;
   typeLabel = transactionTypeLabel;
 
   vm$ = combineLatest([

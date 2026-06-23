@@ -4,6 +4,7 @@ import {
   Member,
   TransactionParticipant,
 } from '../models';
+import { primaryPayerId, validateAdvancePayers } from './advance-allocation';
 
 export interface SplitPreviewLine {
   memberId: string;
@@ -163,13 +164,20 @@ export function buildSplitPreview(
       ? members.map((m) => m.id)
       : input.participantIds;
   const excluded = new Set(input.excludedMemberIds ?? []);
+  const payers =
+    input.payers?.length ?
+      input.payers
+    : input.payerId ?
+      [{ memberId: input.payerId, amount: input.totalAmount }]
+    : [];
+  const primaryPayer = primaryPayerId(payers);
 
   if (input.splitMode === 'equal') {
     const seed = input.remainderSeed ?? `${input.title}-${Date.now()}`;
     return calculateEqualSplit(
       input.totalAmount,
       allParticipantIds,
-      input.payerId,
+      primaryPayer,
       seed,
       excluded
     );
@@ -185,16 +193,18 @@ export function buildSplitPreview(
 export function previewToParticipants(
   preview: SplitPreview,
   payerId: string,
+  payerIds: string[] = [payerId],
   splitNotes?: Record<string, string | null>,
   splitItems?: Record<string, LineItem[]>
 ): TransactionParticipant[] {
+  const payerSet = new Set(payerIds);
   return preview.lines.map((line) => {
     const items = splitItems?.[line.memberId];
     const participant: TransactionParticipant = {
       memberId: line.memberId,
       amount: line.amount,
-      signedAmount: line.memberId === payerId ? line.amount : -line.amount,
-      role: line.memberId === payerId ? 'payer' : 'beneficiary',
+      signedAmount: line.amount,
+      role: payerSet.has(line.memberId) ? 'payer' : 'beneficiary',
       note: splitNotes?.[line.memberId] ?? null,
     };
 
@@ -229,9 +239,15 @@ export function validateCreateInput(
   if (input.totalAmount <= 0) {
     return '總金額必須大於 0';
   }
-  if (!input.payerId) {
-    return '請選擇代墊者';
-  }
+
+  const payers =
+    input.payers?.length ?
+      input.payers
+    : input.payerId ?
+      [{ memberId: input.payerId, amount: input.totalAmount }]
+    : [];
+  const payerError = validateAdvancePayers(payers, input.totalAmount);
+  if (payerError) return payerError;
 
   const allParticipantIds =
     input.participantScope === 'all'

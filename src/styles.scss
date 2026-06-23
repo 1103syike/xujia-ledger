@@ -9,6 +9,7 @@
   --theme-cream: #fff8f0;
   --theme-mint: #b8e8d1;
   --theme-positive: #1a9d62;
+  --theme-debt: #e02525;
   --theme-lavender: #d4c1ec;
   --theme-coral: #ff8fab;
   --theme-ink: #3d3d3d;
@@ -172,6 +173,16 @@ a:focus-visible {
 
   .amount-lg {
     @apply text-lg font-bold tabular-nums text-ink;
+  }
+
+  .amount-neutral {
+    @apply text-base font-bold tabular-nums;
+    color: color-mix(in srgb, var(--theme-ink) 36%, var(--theme-lavender));
+  }
+
+  .amount-lg-neutral {
+    @apply text-lg font-bold tabular-nums;
+    color: color-mix(in srgb, var(--theme-ink) 36%, var(--theme-lavender));
   }
 
   .amount-highlight {
@@ -378,31 +389,42 @@ a:focus-visible {
     line-height: 1;
   }
 
+  .avatar-picker-cell__filled {
+    position: relative;
+  }
+
   .avatar-picker-cell__photo {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  .avatar-picker-cell__actions {
+  .avatar-picker-cell__remove {
+    position: absolute;
+    top: 0.2rem;
+    right: 0.2rem;
+    z-index: 2;
     display: flex;
+    align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    margin-top: 0.25rem;
-  }
-
-  .avatar-picker-cell__action {
-    font-size: 0.65rem;
-    line-height: 1.2;
-    padding: 0.1rem 0.35rem;
+    width: 1.35rem;
+    height: 1.35rem;
     border-radius: 999px;
-    color: color-mix(in srgb, var(--theme-ink) 65%, transparent);
-    background: color-mix(in srgb, var(--theme-cream) 70%, white);
-    border: 1px solid color-mix(in srgb, var(--theme-ink) 10%, transparent);
-  }
+    background: var(--theme-debt);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
 
-  .avatar-picker-cell__action--danger {
-    color: var(--theme-coral);
+    &:disabled {
+      opacity: 0.55;
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.94);
+    }
   }
 
   .sr-only {
@@ -512,6 +534,33 @@ a:focus-visible {
     @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs;
   }
 
+  .member-net-chips {
+    display: grid;
+    grid-template-columns: repeat(var(--member-net-cols, 5), minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .member-net-chip {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border-radius: 1rem;
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+  }
+
+  .member-net-chip__name {
+    @apply w-full truncate text-xs;
+  }
+
+  .member-net-chip__amount {
+    @apply w-full text-xs font-bold tabular-nums leading-tight;
+    color: inherit;
+  }
+
   .bottom-nav {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -532,6 +581,10 @@ a:focus-visible {
 
   .bottom-nav__label {
     @apply block w-full text-center text-xs leading-tight;
+  }
+
+  .consolidate-action-bar {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
 
   .sheet-panel {
@@ -566,6 +619,10 @@ a:focus-visible {
 
   .text-coral {
     color: var(--theme-coral);
+  }
+
+  .text-debt {
+    color: var(--theme-debt);
   }
 
   .text-mint {
@@ -714,4 +771,110 @@ a:focus-visible {
     var(--theme-lavender)
   );
   animation: loading-bar-slide 1.35s ease-in-out infinite;
+}
+
+.interest-estimate {
+  @apply pt-0;
+}
+
+.interest-estimate__hint {
+  @apply font-normal;
+  color: color-mix(in srgb, var(--theme-ink) 45%, transparent);
+}
+
+.interest-estimate__panel {
+  @apply mt-2 rounded-xl px-2 py-2;
+  background: color-mix(in srgb, var(--theme-cream) 85%, white);
+}
+
+.view-switch {
+  @apply flex rounded-2xl p-1;
+  background: color-mix(in srgb, var(--theme-cream) 90%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-peach) 20%, transparent);
+}
+
+.view-switch__btn {
+  @apply flex-1 rounded-xl px-3 py-2 text-xs font-medium transition active:scale-[0.98];
+  color: color-mix(in srgb, var(--theme-ink) 55%, transparent);
+}
+
+.view-switch__btn--active {
+  @apply bg-white shadow-sm;
+  color: var(--theme-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-peach) 25%, transparent);
+}
+
+.interest-estimate__table-wrap {
+  @apply mt-2 -mx-1 overflow-x-auto;
+}
+
+.interest-estimate__table {
+  @apply w-full min-w-[20rem] border-collapse text-xs;
+}
+
+.interest-estimate__table th,
+.interest-estimate__table td {
+  @apply px-1.5 py-1 text-right whitespace-nowrap;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-peach) 15%, transparent);
+}
+
+.interest-estimate__table thead th {
+  @apply pb-1.5 font-medium;
+  color: color-mix(in srgb, var(--theme-ink) 65%, transparent);
+}
+
+.interest-estimate__th-shark {
+  color: var(--theme-coral);
+}
+
+.interest-estimate__table tbody th {
+  @apply text-left font-medium;
+  color: color-mix(in srgb, var(--theme-ink) 80%, transparent);
+}
+
+.interest-estimate__table tbody td {
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--theme-ink) 85%, transparent);
+}
+
+.interest-estimate__total {
+  @apply block font-medium;
+}
+
+.interest-estimate__fee {
+  @apply block text-[10px] leading-tight;
+  color: color-mix(in srgb, var(--theme-ink) 50%, transparent);
+}
+
+.interest-estimate__td-shark .interest-estimate__total {
+  color: var(--theme-coral);
+}
+
+.interest-estimate__td-shark .interest-estimate__fee {
+  color: color-mix(in srgb, var(--theme-coral) 75%, transparent);
+  font-weight: 600;
+}
+
+.settlement-sheet__row {
+  @apply stack-sm;
+}
+
+.settlement-creditor-group {
+  @apply rounded-2xl px-3 py-3;
+  background: color-mix(in srgb, var(--theme-cream) 55%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-peach) 18%, transparent);
+}
+
+.settlement-creditor-group__head {
+  @apply flex items-start gap-2 pb-2;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-peach) 15%, transparent);
+}
+
+.settlement-tx-list {
+  @apply mt-2 stack-sm;
+}
+
+.settlement-tx-row {
+  @apply rounded-xl bg-white/80 px-3 py-2.5;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-peach) 12%, transparent);
 }

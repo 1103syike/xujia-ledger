@@ -42,8 +42,24 @@ export interface Member {
   loginEmail: string;
 }
 
+export type TransferDirection = 'pay' | 'receive';
+
 export interface LineItem {
   note: string;
+  amount: number;
+  /** 債務轉移對象（transfer lineItems） */
+  counterpartyId?: string;
+  direction?: TransferDirection;
+}
+
+export interface TransferEdge {
+  fromId: string;
+  toId: string;
+  amount: number;
+}
+
+export interface AdvancePayer {
+  memberId: string;
   amount: number;
 }
 
@@ -68,8 +84,12 @@ export interface Transaction {
   date?: string;
   totalAmount: number;
   billTotal?: number | null;
-  /** 代墊者（advance）或還款收款人（repayment） */
+  /** 代墊者（advance）或還款收款人（repayment）；相容舊資料，為第一位代墊者 */
   payerId: string;
+  /** 多位代墊者與各自代墊金額 */
+  payers?: AdvancePayer[];
+  /** 代墊實付超過分攤總額的找零（依代墊比例退回代墊者） */
+  changeAmount?: number | null;
   /** 還款付款人（repayment only） */
   fromMemberId?: string | null;
   participantScope?: ParticipantScope;
@@ -83,6 +103,12 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
   participants: TransactionParticipant[];
+  /** 納入此筆債務整合的來源交易 id */
+  sourceTransactionIds?: string[];
+  /** 債務轉移清單（from 付給 to） */
+  transferEdges?: TransferEdge[];
+  /** 已被哪筆債務整合納入（來源交易） */
+  settledByTransferId?: string | null;
 }
 
 export interface AuditLog {
@@ -113,6 +139,8 @@ export interface CreateAdvanceInput {
   totalAmount: number;
   billTotal?: number | null;
   payerId: string;
+  /** 多位代墊者；未填時以 payerId + totalAmount 視為單人代墊 */
+  payers?: AdvancePayer[];
   participantScope: ParticipantScope;
   participantIds: string[];
   splitMode: SplitMode;
@@ -130,6 +158,18 @@ export interface CreateRepaymentInput {
   amount: number;
   date: string;
   note?: string | null;
+}
+
+export interface CreateTransferInput {
+  date: string;
+  title?: string;
+  note?: string | null;
+  sourceTransactionIds: string[];
+}
+
+export interface CreateTransferResult {
+  error: string | null;
+  transactionId?: string;
 }
 
 /** @deprecated 使用 CreateAdvanceInput */

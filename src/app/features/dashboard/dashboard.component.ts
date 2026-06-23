@@ -4,7 +4,11 @@ import { RouterLink } from '@angular/router';
 import { combineLatest, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TransactionService } from '../../core/services/transaction.service';
-import { netBalances, settlementsForMember } from '../../core/utils/ledger-calculator';
+import { netBalances, settlementsForMember, signedImpactOnMember } from '../../core/utils/ledger-calculator';
+import {
+  formatOweAmount,
+  formatOwedAmount,
+} from '../../core/utils/settlement-display';
 import {
   allClearQuip,
   buildRoastMessage,
@@ -16,7 +20,10 @@ import {
   totalDebtRanking,
 } from '../../core/utils/dashboard-insights';
 import { activeTransactions, transactionTypeLabel } from '../../core/utils/transaction-date';
+import { formatAdvancePayerNames } from '../../core/utils/advance-display';
+import { memberNetRowsForTransaction } from '../../core/utils/transaction-member-nets';
 import { MemberAvatarComponent } from '../../shared/components/member-avatar.component';
+import { MemberNetChipsComponent } from '../../shared/components/member-net-chips.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
 import { KaomojiDecoComponent } from '../../shared/components/kaomoji-deco.component';
 import {
@@ -24,6 +31,12 @@ import {
   memberColorSoftBg,
   memberColorSolid,
 } from '../../core/utils/member-color';
+import { SettlementEntry, Transaction } from '../../core/models';
+import {
+  PairSettlementView,
+  SettlementPairRow,
+  SettlementSheetComponent,
+} from '../../shared/components/settlement-sheet.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -34,6 +47,8 @@ import {
     MemberAvatarComponent,
     TransactionDatePipe,
     KaomojiDecoComponent,
+    SettlementSheetComponent,
+    MemberNetChipsComponent,
   ],
   template: `
     <div class="page" *ngIf="vm$ | async as vm">
@@ -52,21 +67,21 @@ import {
             *ngFor="let s of vm.mySettlements"
             class="inset-panel flex items-center justify-between gap-3"
           >
-            <a
-              [routerLink]="['/transactions']"
-              [queryParams]="{ with: s.otherId }"
-              class="flex min-w-0 flex-1 items-center gap-3"
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-center gap-3 text-left"
+              (click)="openPairSettlement(vm.activeTransactions, vm.memberId, s)"
             >
               <ng-container *ngIf="auth.getMember(s.otherId) as member">
                 <app-member-avatar [member]="member" size="sm" />
                 <div class="min-w-0 flex-1">
                   <p class="item-title">{{ member.name }}</p>
                   <p class="caption-text">
-                    {{ s.direction === 'owe' ? '你欠他' : '欠你' }}
+                    {{ s.direction === 'owe' ? '你債主' : '欠你錢的人' }}
                   </p>
                 </div>
               </ng-container>
-            </a>
+            </button>
             <a
               *ngIf="s.direction === 'owe'"
               [routerLink]="['/transactions/new']"
@@ -75,13 +90,15 @@ import {
             >
               還款
             </a>
-            <a
-              [routerLink]="['/transactions']"
-              [queryParams]="{ with: s.otherId }"
+            <button
+              type="button"
               class="amount-highlight shrink-0"
+              [class.text-debt]="s.direction === 'owe'"
+              [class.text-positive]="s.direction === 'owed'"
+              (click)="openPairSettlement(vm.activeTransactions, vm.memberId, s)"
             >
-              NT$ {{ s.amount }}
-            </a>
+              {{ s.direction === 'owe' ? formatOweAmount(s.amount) : formatOwedAmount(s.amount) }}
+            </button>
           </div>
         </div>
       </section>
@@ -89,18 +106,18 @@ import {
       <section class="card card-highlight-rank" *ngIf="vm.debtRanking.length > 0">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <p class="card-title">🏆 許家負債排行榜</p>
-            <p class="helper-text mt-1">娛樂用途，認真你就輸了 · 共 {{ quoteCounts.roast }} 種催法</p>
+            <p class="card-title">待結算排行</p>
+            <p class="helper-text mt-1">淨待結算（欠的扣掉代墊收回）負最多前三名</p>
           </div>
           <button type="button" class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95" (click)="refreshRankQuotes()">🔄 換文案</button>
         </div>
         <div class="stack-sm mt-3">
-          <a
+          <button
+            type="button"
             *ngFor="let entry of vm.debtRanking.slice(0, 3); let i = index"
-            [routerLink]="['/transactions']"
-            [queryParams]="{ with: entry.memberId }"
-            class="inset-panel rank-row flex items-center gap-3"
+            class="inset-panel rank-row flex w-full items-center gap-3 text-left"
             [style.--rank-accent]="memberColorSolid(auth.getMember(entry.memberId)?.color || '')"
+            (click)="openDebtBreakdown(vm.activeTransactions, entry.memberId)"
           >
             <span class="text-lg leading-none">{{ rankMedal(i) }}</span>
             <ng-container *ngIf="auth.getMember(entry.memberId) as member">
@@ -110,16 +127,18 @@ import {
                 <p class="caption-text mt-0.5">{{ rankQuipLine(entry.memberId, i) }}</p>
               </div>
             </ng-container>
-            <span class="amount-highlight shrink-0 text-sm">NT$ {{ entry.total }}</span>
-          </a>
+            <span
+              class="amount-highlight shrink-0 text-sm text-debt"
+            >{{ formatOweAmount(entry.total) }}</span>
+          </button>
         </div>
       </section>
 
       <section class="card card-highlight-debt" *ngIf="vm.myDebtors.length > 0">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <p class="card-title">📣 欠我錢的人</p>
-            <p class="helper-text mt-1">複製訊息，靠北得剛剛好</p>
+            <p class="card-title">待向你還款</p>
+            <p class="helper-text mt-1">可複製提醒訊息，方便與家人溝通</p>
           </div>
           <button type="button" class="caption-text shrink-0 rounded-full bg-white/80 px-3 py-1 active:scale-95" (click)="refreshDebtorCardQuotes()">🔄 換文案</button>
         </div>
@@ -133,16 +152,28 @@ import {
                   <p class="caption-text mt-0.5">{{ debtorQuipLine(debtor.memberId, vm.memberId) }}</p>
                 </div>
               </ng-container>
-              <span class="amount-highlight shrink-0 text-sm">NT$ {{ debtor.amount }}</span>
+              <span class="amount-highlight shrink-0 text-sm text-positive">{{ formatOwedAmount(debtor.amount) }}</span>
             </div>
             <p class="helper-text mt-2 rounded-xl bg-white/70 px-3 py-2 italic">「{{ roastPreview(debtor.memberId, debtor.amount) }}」</p>
             <div class="mt-2 flex gap-2">
               <button type="button" class="btn-secondary btn-sm flex-1" (click)="refreshDebtorQuote(debtor.memberId)">🔄 換一句</button>
-              <button type="button" class="btn-primary btn-sm flex-1" (click)="copyRoast(debtor.memberId, debtor.amount)">{{ copiedId === debtor.memberId ? '已複製 ✓' : '複製催款' }}</button>
+              <button type="button" class="btn-primary btn-sm flex-1" (click)="copyRoast(debtor.memberId, debtor.amount)">{{ copiedId === debtor.memberId ? '已複製 ✓' : '複製提醒' }}</button>
             </div>
           </div>
         </div>
       </section>
+
+      <app-settlement-sheet
+        [open]="sheetOpen"
+        [title]="sheetTitle"
+        [subtitle]="sheetSubtitle"
+        [mode]="sheetMode"
+        [subjectMemberId]="sheetSubjectId"
+        [settlementRows]="sheetSettlementRows"
+        [pair]="sheetPair"
+        [transactions]="sheetTransactions"
+        (closed)="closeSheet()"
+      />
 
       <section class="section">
         <div class="section-header">
@@ -159,23 +190,32 @@ import {
               </div>
               <p class="helper-text mt-1">
                 {{ tx | transactionDate }}
-                <ng-container *ngIf="tx.type === 'advance'">· 代墊：{{ auth.getMember(tx.payerId)?.name }}</ng-container>
+                <ng-container *ngIf="tx.type === 'advance'">· 代墊：{{ advancePayerNames(tx) }}</ng-container>
                 <ng-container *ngIf="tx.type === 'repayment'">· {{ auth.getMember(tx.fromMemberId ?? '')?.name }} → {{ auth.getMember(tx.payerId)?.name }}</ng-container>
+                <ng-container *ngIf="tx.type === 'transfer'">· 整合 {{ tx.sourceTransactionIds?.length ?? 0 }} 筆交易</ng-container>
               </p>
             </div>
-            <p class="amount-lg shrink-0">NT$ {{ tx.totalAmount }}</p>
-          </div>
-          <div *ngIf="tx.type === 'advance'" class="mt-3 flex flex-wrap gap-2">
-            <span *ngFor="let p of tx.participants" class="chip inline-flex items-center gap-1.5" [style.background-color]="memberColorSoftBg(auth.getMember(p.memberId)?.color || '')" [style.box-shadow]="'inset 0 0 0 1px ' + memberColorBorder(auth.getMember(p.memberId)?.color || '')">
-              <app-member-avatar *ngIf="auth.getMember(p.memberId) as splitMember" [member]="splitMember" size="xs" />
-              NT$ {{ p.amount }}
+            <span
+              class="shrink-0"
+              [class.amount-lg]="vm.latestImpact !== 0"
+              [class.amount-lg-neutral]="vm.latestImpact === 0"
+              [class.text-debt]="vm.latestImpact < 0"
+              [class.text-positive]="vm.latestImpact > 0"
+            >
+              <ng-container *ngIf="vm.latestImpact < 0">{{ formatOweAmount(-vm.latestImpact) }}</ng-container>
+              <ng-container *ngIf="vm.latestImpact > 0">+{{ formatOwedAmount(vm.latestImpact) }}</ng-container>
+              <ng-container *ngIf="vm.latestImpact === 0">NT$ {{ tx.totalAmount }}</ng-container>
             </span>
           </div>
+          <app-member-net-chips
+            *ngIf="vm.latestMemberNets.length > 0"
+            [rows]="vm.latestMemberNets"
+          />
         </a>
 
         <div *ngIf="!vm.latest" class="empty-state">
           <app-kaomoji-deco mood="expense" seed="latest" />
-          <p class="empty-state__text">尚無交易紀錄，歡迎建立第一筆</p>
+          <p class="empty-state__text">尚無交易紀錄，歡迎新增第一筆</p>
           <a routerLink="/transactions/new" class="btn-primary mt-4 inline-block">新增交易</a>
         </div>
       </section>
@@ -183,6 +223,8 @@ import {
   `,
 })
 export class DashboardComponent {
+  formatOweAmount = formatOweAmount;
+  formatOwedAmount = formatOwedAmount;
   rankTitle = rankTitle;
   quoteCounts = quoteCounts();
   typeLabel = transactionTypeLabel;
@@ -194,6 +236,14 @@ export class DashboardComponent {
   debtorCardSalt = 0;
   clearSalt = 0;
   debtorSalts: Record<string, number> = {};
+  sheetOpen = false;
+  sheetMode: 'debt-breakdown' | 'pair' = 'debt-breakdown';
+  sheetTitle = '';
+  sheetSubtitle?: string;
+  sheetSubjectId = '';
+  sheetSettlementRows: SettlementPairRow[] = [];
+  sheetPair: PairSettlementView | null = null;
+  sheetTransactions: Transaction[] = [];
 
   vm$ = combineLatest([
     this.transactions.transactions$,
@@ -203,13 +253,23 @@ export class DashboardComponent {
       const active = activeTransactions(transactions);
       const memberId = member?.id ?? '';
 
+      const latest = active[0] ?? null;
+      const latestImpact =
+        latest && memberId ? signedImpactOnMember(latest, memberId) : 0;
+      const latestMemberNets = latest
+        ? memberNetRowsForTransaction(latest)
+        : [];
+
       return {
         memberId,
+        activeTransactions: active,
         balances: netBalances(active),
         mySettlements: memberId ? settlementsForMember(active, memberId) : [],
         debtRanking: totalDebtRanking(active),
         myDebtors: memberId ? debtorsToCreditor(active, memberId) : [],
-        latest: active[0] ?? null,
+        latest,
+        latestImpact,
+        latestMemberNets,
       };
     })
   );
@@ -243,13 +303,65 @@ export class DashboardComponent {
     return rankQuip(memberId, index, this.rankSalt);
   }
 
+  openPairSettlement(
+    active: Transaction[],
+    memberId: string,
+    settlement: SettlementEntry
+  ): void {
+    const name = this.auth.getMember(settlement.otherId)?.name ?? '';
+    this.sheetMode = 'pair';
+    this.sheetTitle = `${name} · 結算明細`;
+    this.sheetSubtitle = undefined;
+    this.sheetPair = {
+      viewerId: memberId,
+      otherId: settlement.otherId,
+      direction: settlement.direction,
+      amount: settlement.amount,
+    };
+    this.sheetSubjectId = '';
+    this.sheetSettlementRows = [];
+    this.sheetTransactions = active;
+    this.sheetOpen = true;
+  }
+
+  openDebtBreakdown(active: Transaction[], memberId: string): void {
+    const name = this.auth.getMember(memberId)?.name ?? '';
+    this.sheetMode = 'debt-breakdown';
+    this.sheetTitle = `${name} 的待結算明細`;
+    this.sheetSubtitle = '淨待結算含代墊與還款，以下分別列出與各家人的往來';
+    this.sheetSubjectId = memberId;
+    this.sheetSettlementRows = settlementsForMember(active, memberId)
+      .map((s) => ({
+        otherId: s.otherId,
+        direction: s.direction,
+        amount: s.amount,
+      }))
+      .sort((a, b) => {
+        if (a.direction !== b.direction) {
+          return a.direction === 'owe' ? -1 : 1;
+        }
+        return b.amount - a.amount;
+      });
+    this.sheetPair = null;
+    this.sheetTransactions = active;
+    this.sheetOpen = true;
+  }
+
+  closeSheet(): void {
+    this.sheetOpen = false;
+  }
+
   debtorQuipLine(debtorId: string, creditorId: string): string {
     return debtorCardQuip(debtorId, creditorId, this.debtorCardSalt);
   }
 
   clearQuipLine(memberId: string): string {
-    if (!memberId) return '全家清清白白的，今天可以加雞腿。';
+    if (!memberId) return '目前沒有待結算款項，帳本狀態良好。';
     return allClearQuip(memberId, this.clearSalt);
+  }
+
+  advancePayerNames(tx: import('../../core/models').Transaction): string {
+    return formatAdvancePayerNames(tx, (id) => this.auth.getMember(id)?.name ?? id);
   }
 
   roastPreview(debtorId: string, amount: number): string {

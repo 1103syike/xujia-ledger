@@ -2,7 +2,7 @@ import { Component, Input, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Member } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
-import { memberColorSolid, memberColorBorder } from '../../core/utils/member-color';
+import { memberColorBorder, normalizeMemberColor } from '../../core/utils/member-color';
 import { MemberAvatarComponent } from './member-avatar.component';
 
 export interface PieSliceInput {
@@ -119,7 +119,7 @@ export class SplitPieChartComponent implements OnChanges {
           memberId: slice.memberId,
           amount: slice.amount,
           percent: Math.round((slice.amount / this.chartTotal) * 1000) / 10,
-          color: memberColorSolid(member?.color ?? '#FFB5A7'),
+          color: normalizeMemberColor(member?.color ?? '#FFB5A7'),
           label: member?.name ?? slice.memberId,
           member,
         };

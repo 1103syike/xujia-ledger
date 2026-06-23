@@ -7,6 +7,10 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Member } from '../../core/models';
+import {
+  formatNetBalance,
+  netBalanceClass,
+} from '../../core/utils/settlement-display';
 import { MemberAvatarComponent } from './member-avatar.component';
 
 @Component({
@@ -28,8 +32,12 @@ import { MemberAvatarComponent } from './member-avatar.component';
         <app-member-avatar [member]="selected" size="md" />
         <div class="flex min-w-0 flex-1 flex-col">
           <span class="item-title">{{ selected.name }}</span>
-          <span *ngIf="selectedOweLabel" class="caption-text text-coral">
-            {{ selectedOweLabel }}
+          <span
+            *ngIf="selectedOweLabel as oweLabel"
+            class="caption-text"
+            [ngClass]="selectedOweClass"
+          >
+            {{ oweLabel }}
           </span>
         </div>
       </ng-container>
@@ -154,8 +162,12 @@ export class MemberPickerComponent {
 
   get selectedOweLabel(): string | null {
     if (!this.oweAmounts || !this.value) return null;
-    const owe = this.oweAmounts[this.value] ?? 0;
-    return owe > 0 ? `欠 NT$ ${owe}` : null;
+    return formatNetBalance(this.oweAmounts[this.value] ?? 0);
+  }
+
+  get selectedOweClass(): string {
+    if (!this.oweAmounts || !this.value) return '';
+    return netBalanceClass(this.oweAmounts[this.value] ?? 0);
   }
 
   isSelectable(memberId: string): boolean {
@@ -166,17 +178,15 @@ export class MemberPickerComponent {
   memberSubtitle(memberId: string): string | null {
     if (!this.oweAmounts) return null;
     const owe = this.oweAmounts[memberId] ?? 0;
-    if (owe > 0) return `欠 NT$ ${owe}`;
-    if (owe < 0) return `他欠你 NT$ ${-owe}`;
-    return '已結清';
+    if (owe === 0) return '已結清';
+    return formatNetBalance(owe);
   }
 
   amountClass(memberId: string): string {
     if (!this.oweAmounts) return '';
     const owe = this.oweAmounts[memberId] ?? 0;
-    if (owe > 0) return 'text-coral';
-    if (owe < 0) return 'text-positive';
-    return 'caption-text';
+    if (owe === 0) return 'caption-text';
+    return netBalanceClass(owe);
   }
 
   @HostListener('document:keydown.escape')

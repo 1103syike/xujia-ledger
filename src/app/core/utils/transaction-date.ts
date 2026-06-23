@@ -79,6 +79,11 @@ interface LegacyExpenseDoc {
   type?: Transaction['type'];
   fromMemberId?: string | null;
   accountId?: string;
+  sourceTransactionIds?: string[];
+  transferEdges?: Transaction['transferEdges'];
+  settledByTransferId?: string | null;
+  payers?: Transaction['payers'];
+  changeAmount?: number | null;
 }
 
 function legacySplitsToParticipants(
@@ -132,6 +137,28 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     };
   }
 
+  if (type === 'transfer') {
+    return {
+      id: raw.id,
+      accountId: raw.accountId ?? 'default',
+      type: 'transfer',
+      title: raw.title || '債務轉移',
+      date: normalizeTransactionDate(raw),
+      totalAmount: raw.totalAmount,
+      payerId: raw.payerId ?? '',
+      splitMode: 'itemized',
+      note: raw.note ?? null,
+      status,
+      createdBy: raw.createdBy,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      participants: raw.participants ?? [],
+      sourceTransactionIds: raw.sourceTransactionIds,
+      transferEdges: raw.transferEdges,
+      settledByTransferId: raw.settledByTransferId ?? null,
+    };
+  }
+
   const participants =
     raw.participants ??
     legacySplitsToParticipants(raw.splits ?? [], raw.payerId);
@@ -145,6 +172,8 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     totalAmount: raw.totalAmount,
     billTotal: raw.billTotal ?? null,
     payerId: raw.payerId,
+    payers: raw.payers,
+    changeAmount: raw.changeAmount ?? null,
     participantScope: raw.participantScope ?? 'all',
     participantIds: raw.participantIds,
     splitMode: raw.splitMode ?? 'equal',
@@ -156,6 +185,7 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     participants,
+    settledByTransferId: raw.settledByTransferId ?? null,
   };
 }
 
@@ -175,7 +205,7 @@ export function transactionTypeLabel(type: Transaction['type']): string {
     case 'adjustment':
       return '調整';
     case 'transfer':
-      return '轉帳';
+      return '債務轉移';
     default:
       return type;
   }

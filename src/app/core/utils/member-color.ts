@@ -43,16 +43,16 @@ export function memberColorSolid(hex: string): string {
   return toHex(c.r * factor, c.g * factor, c.b * factor);
 }
 
-/** 分攤標籤等柔和底色 */
+/** 分攤標籤等柔和底色（使用使用者選擇的原色） */
 export function memberColorSoftBg(hex: string): string {
-  const solid = memberColorSolid(hex);
-  const c = parseHex(solid)!;
-  return `rgba(${c.r}, ${c.g}, ${c.b}, 0.38)`;
+  const base = normalizeMemberColor(hex);
+  const c = parseHex(base)!;
+  return `rgba(${c.r}, ${c.g}, ${c.b}, 0.42)`;
 }
 
-/** 標籤描邊，避免淺色與白底融在一起 */
+/** 標籤描邊（使用使用者選擇的原色） */
 export function memberColorBorder(hex: string): string {
-  const solid = memberColorSolid(hex);
-  const c = parseHex(solid)!;
-  return `rgba(${c.r}, ${c.g}, ${c.b}, 0.55)`;
+  const base = normalizeMemberColor(hex);
+  const c = parseHex(base)!;
+  return `rgba(${c.r}, ${c.g}, ${c.b}, 0.58)`;
 }

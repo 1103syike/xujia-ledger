@@ -16,7 +16,17 @@ export function formatAuditLog(
   switch (log.action) {
     case 'transaction.advance.created':
     case 'expense.created': {
-      const payer = memberName(String(p['payerId'])) ?? String(p['payerId']);
+      const payers = (p['payers'] ?? []) as Array<{
+        name?: string;
+        memberId?: string;
+        amount: number;
+      }>;
+      const payerLabel =
+        payers.length > 1 ?
+          payers
+            .map((row) => `${row.name ?? row.memberId ?? '—'} NT$ ${row.amount}`)
+            .join('、')
+        : (memberName(String(p['payerId'])) ?? String(p['payerId']));
       const splitMode = p['splitMode'] === 'itemized' ? '細分' : '平分';
       const lines = [`${actor} 建立了代墊`, `項目：${p['title']}`];
       if (p['date']) {
@@ -24,7 +34,7 @@ export function formatAuditLog(
       }
       lines.push(
         `總額 NT$ ${p['totalAmount']}`,
-        `代墊者：${payer} · ${splitMode}`
+        `代墊者：${payerLabel} · ${splitMode}`
       );
       const participants = (p['participants'] ?? p['splits']) as
         | Array<{ name: string; amount: number; lineItems?: Array<{ note: string; amount: number }>; items?: Array<{ note: string; amount: number }> }>
@@ -57,6 +67,24 @@ export function formatAuditLog(
         lines.push(`日期：${formatTransactionDateLabel(String(p['date']))}`);
       }
       return { title: '建立還款', lines };
+    }
+    case 'transaction.transfer.created': {
+      const edges = (p['transferEdges'] ?? []) as Array<{
+        fromName: string;
+        toName: string;
+        amount: number;
+      }>;
+      const lines = [
+        `${actor} 建立了債務轉移`,
+        `整合 ${(p['sourceTransactionIds'] as string[] | undefined)?.length ?? 0} 筆交易`,
+      ];
+      if (p['date']) {
+        lines.push(`日期：${formatTransactionDateLabel(String(p['date']))}`);
+      }
+      for (const e of edges) {
+        lines.push(`${e.fromName} → ${e.toName} NT$ ${e.amount}`);
+      }
+      return { title: '建立債務轉移', lines };
     }
     case 'transaction.voided':
     case 'expense.cancelled': {

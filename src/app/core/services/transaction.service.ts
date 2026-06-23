@@ -8,6 +8,7 @@ import {
   query,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { BehaviorSubject, map } from 'rxjs';
 import { firestoreDb } from '../firebase';
@@ -15,15 +16,27 @@ import {
   AuditLog,
   CreateAdvanceInput,
   CreateRepaymentInput,
+  CreateTransferInput,
+  CreateTransferResult,
   DEFAULT_ACCOUNT_ID,
   Transaction,
 } from '../models';
+import {
+  buildConsolidationPreview,
+  consolidationToParticipants,
+  validateConsolidationInput,
+} from '../utils/debt-consolidation';
 import {
   buildSplitPreview,
   previewToParticipants,
   validateCreateInput,
   validateRepaymentInput,
 } from '../utils/split-calculator';
+import {
+  advanceMemberBalances,
+  advanceChangeAmount,
+  primaryPayerId,
+} from '../utils/advance-allocation';
 import { formatFirestoreError, stripUndefined } from '../utils/firestore-data';
 import {
   compareTransactionsByDate,
@@ -99,9 +112,15 @@ export class TransactionService implements OnDestroy {
       { ...input, remainderSeed: seed },
       this.auth.getAllMembers()
     );
+    const payers =
+      input.payers?.length ?
+        input.payers.map((p) => ({ ...p }))
+      : [{ memberId: input.payerId, amount: input.totalAmount }];
+    const payerIds = payers.map((p) => p.memberId);
     const participants = previewToParticipants(
       preview,
-      input.payerId,
+      primaryPayerId(payers),
+      payerIds,
       input.splitNotes,
       input.splitItems
     );
@@ -115,7 +134,9 @@ export class TransactionService implements OnDestroy {
       date: input.date,
       totalAmount: input.totalAmount,
       billTotal: input.billTotal ?? null,
-      payerId: input.payerId,
+      payerId: primaryPayerId(payers),
+      payers,
+      changeAmount: advanceChangeAmount(payers, input.totalAmount) || null,
       participantScope: input.participantScope,
       participantIds:
         input.participantScope === 'all'
@@ -131,6 +152,12 @@ export class TransactionService implements OnDestroy {
       updatedAt: now,
       participants,
     };
+
+    const balances = advanceMemberBalances(transaction);
+    for (const p of transaction.participants) {
+      const net = balances.get(p.memberId);
+      if (net !== undefined) p.signedAmount = net;
+    }
 
     try {
       await setDoc(
@@ -148,6 +175,11 @@ export class TransactionService implements OnDestroy {
           totalAmount: transaction.totalAmount,
           payerId: transaction.payerId,
           payerName: memberName(this.auth, transaction.payerId),
+          payers: transaction.payers?.map((p) => ({
+            memberId: p.memberId,
+            name: memberName(this.auth, p.memberId),
+            amount: p.amount,
+          })),
           splitMode: transaction.splitMode,
           note: transaction.note,
           participants: transaction.participants.map((p) => ({
@@ -241,6 +273,100 @@ export class TransactionService implements OnDestroy {
     }
   }
 
+  async createTransfer(input: CreateTransferInput): Promise<CreateTransferResult> {
+    const actor = this.auth.currentMember;
+    if (!actor) return { error: '請先登入帳號' };
+
+    const members = this.auth.getAllMembers();
+    const memberIds = members.map((m) => m.id);
+    const error = validateConsolidationInput(
+      input.sourceTransactionIds,
+      this.transactions,
+      memberIds
+    );
+    if (error) return { error };
+
+    const selected = input.sourceTransactionIds
+      .map((id) => this.transactions.find((t) => t.id === id))
+      .filter((t): t is Transaction => !!t);
+    const preview = buildConsolidationPreview(selected, memberIds);
+    const participants = consolidationToParticipants(preview);
+
+    const seed = crypto.randomUUID?.() ?? `${Date.now()}`;
+    const now = new Date().toISOString();
+
+    const transaction: Transaction = {
+      id: seed,
+      accountId: DEFAULT_ACCOUNT_ID,
+      type: 'transfer',
+      title: input.title?.trim() || '債務轉移',
+      date: input.date,
+      totalAmount: preview.totalTransferVolume,
+      payerId: actor.id,
+      splitMode: 'itemized',
+      note: input.note?.trim() || null,
+      status: 'active',
+      createdBy: actor.id,
+      createdAt: now,
+      updatedAt: now,
+      participants,
+      sourceTransactionIds: [...input.sourceTransactionIds],
+      transferEdges: preview.edges,
+    };
+
+    try {
+      const batch = writeBatch(firestoreDb);
+      batch.set(
+        doc(firestoreDb, 'transactions', transaction.id),
+        stripUndefined(transaction)
+      );
+
+      for (const sourceId of input.sourceTransactionIds) {
+        const coll = this.legacyTransactionIds.has(sourceId)
+          ? 'expenses'
+          : 'transactions';
+        batch.update(doc(firestoreDb, coll, sourceId), {
+          settledByTransferId: transaction.id,
+          updatedAt: now,
+        });
+      }
+
+      await batch.commit();
+
+      await this.addAudit({
+        actorId: actor.id,
+        action: 'transaction.transfer.created',
+        entityType: 'transaction',
+        entityId: transaction.id,
+        payload: stripUndefined({
+          title: transaction.title,
+          date: transaction.date,
+          totalAmount: transaction.totalAmount,
+          sourceTransactionIds: transaction.sourceTransactionIds,
+          transferEdges: preview.edges.map((e) => ({
+            fromId: e.fromId,
+            fromName: memberName(this.auth, e.fromId),
+            toId: e.toId,
+            toName: memberName(this.auth, e.toId),
+            amount: e.amount,
+          })),
+          note: transaction.note,
+        }),
+      });
+      return { error: null, transactionId: transaction.id };
+    } catch (error) {
+      console.error('createTransfer failed', error);
+      return { error: formatFirestoreError(error) };
+    }
+  }
+
+  private sourceDocRef(sourceId: string) {
+    const coll = this.legacyTransactionIds.has(sourceId)
+      ? 'expenses'
+      : 'transactions';
+    return doc(firestoreDb, coll, sourceId);
+  }
+
   async voidTransaction(transactionId: string): Promise<string | null> {
     const actor = this.auth.currentMember;
     if (!actor) return '請先登入帳號';
@@ -248,6 +374,10 @@ export class TransactionService implements OnDestroy {
     const transaction = this.transactions.find((t) => t.id === transactionId);
     if (!transaction) return '找不到此筆交易';
     if (transaction.status !== 'active') return '此筆交易已作廢';
+
+    if (transaction.settledByTransferId) {
+      return '此筆已納入債務轉移，請先作廢該筆整合交易';
+    }
 
     try {
       const now = new Date().toISOString();
@@ -262,6 +392,16 @@ export class TransactionService implements OnDestroy {
           updatedAt: now,
         });
       }
+
+      if (transaction.type === 'transfer' && transaction.sourceTransactionIds) {
+        for (const sourceId of transaction.sourceTransactionIds) {
+          await updateDoc(this.sourceDocRef(sourceId), {
+            settledByTransferId: null,
+            updatedAt: now,
+          });
+        }
+      }
+
       await this.addAudit({
         actorId: actor.id,
         action: 'transaction.voided',

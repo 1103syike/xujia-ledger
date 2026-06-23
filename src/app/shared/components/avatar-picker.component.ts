@@ -31,7 +31,7 @@ import { MemberChibiHeadComponent } from './member-chibi-head.component';
     <div>
       <label class="field-label">頭像</label>
       <p class="helper-text mb-2">
-        上排可上傳照片（即時儲存），下排為 Q 版造型；選好後請按「儲存設定」
+        上排可上傳照片（即時儲存），點右上角 ✕ 可刪除；下排為 Q 版造型。選好後請按「儲存設定」
       </p>
 
       <p
@@ -61,39 +61,30 @@ import { MemberChibiHeadComponent } from './member-chibi-head.component';
             <span class="avatar-picker-cell__label">槽位 {{ slot }}</span>
           </button>
 
-          <button
-            *ngIf="hasSlot(slot)"
-            type="button"
-            class="avatar-picker-cell__button"
-            [disabled]="slotBusy"
-            [attr.aria-label]="'選擇槽位 ' + slot + ' 為頭像'"
-            [attr.aria-pressed]="isSlotSelected(slot)"
-            (click)="selectSlot(slot)"
-          >
-            <img
-              *ngIf="slotPreviewUrls[slot]"
-              class="avatar-picker-cell__photo"
-              [src]="slotPreviewUrls[slot]"
-              alt=""
-            />
-          </button>
-
-          <div *ngIf="hasSlot(slot)" class="avatar-picker-cell__actions">
+          <div *ngIf="hasSlot(slot)" class="avatar-picker-cell__filled">
             <button
               type="button"
-              class="avatar-picker-cell__action"
+              class="avatar-picker-cell__button"
               [disabled]="slotBusy"
-              (click)="openFilePicker(slot)"
+              [attr.aria-label]="'選擇槽位 ' + slot + ' 為頭像'"
+              [attr.aria-pressed]="isSlotSelected(slot)"
+              (click)="selectSlot(slot)"
             >
-              更換
+              <img
+                *ngIf="slotPreviewUrls[slot]"
+                class="avatar-picker-cell__photo"
+                [src]="slotPreviewUrls[slot]"
+                alt=""
+              />
             </button>
             <button
               type="button"
-              class="avatar-picker-cell__action avatar-picker-cell__action--danger"
+              class="avatar-picker-cell__remove"
               [disabled]="slotBusy"
+              [attr.aria-label]="'刪除槽位 ' + slot + ' 的照片'"
               (click)="removeSlot(slot)"
             >
-              刪除
+              <span aria-hidden="true">×</span>
             </button>
           </div>
         </div>

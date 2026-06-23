@@ -1,5 +1,13 @@
 import { Transaction } from '../models';
-import { computeBalances, netBalances, transactionsBetweenMembers } from './ledger-calculator';
+import {
+  computeBalances,
+  creditorsOwedByMember,
+  memberNetBalance,
+  netBalances,
+  signedImpactOnMember,
+  signedImpactOnPair,
+  transactionsBetweenMembers,
+} from './ledger-calculator';
 
 function advance(
   id: string,
@@ -80,6 +88,139 @@ describe('ledger-calculator', () => {
     const owed = raw.find((e) => e.fromId === 'm1' && e.toId === 'm2');
     expect(owed?.amount).toBe(300);
   });
+
+  it('transfer edges replace settled advances in net balances', () => {
+    const settledAdvance: Transaction = {
+      ...advance('1', 'm1', [
+        { memberId: 'm1', amount: 50 },
+        { memberId: 'm2', amount: 50 },
+      ]),
+      settledByTransferId: 't1',
+    };
+    const transfer: Transaction = {
+      id: 't1',
+      accountId: 'default',
+      type: 'transfer',
+      title: '債務轉移',
+      totalAmount: 50,
+      payerId: 'm1',
+      status: 'active',
+      createdBy: 'm1',
+      createdAt: '2025-01-03T00:00:00.000Z',
+      updatedAt: '2025-01-03T00:00:00.000Z',
+      participants: [],
+      sourceTransactionIds: ['1'],
+      transferEdges: [{ fromId: 'm2', toId: 'm1', amount: 50 }],
+    };
+
+    const net = netBalances([settledAdvance, transfer]);
+    const edge = net.find((e) => e.fromId === 'm2' && e.toId === 'm1');
+    expect(edge?.amount).toBe(50);
+  });
+
+  it('nets bidirectional debts between two members', () => {
+    const txs: Transaction[] = [
+      advance('1', 'm2', [
+        { memberId: 'm2', amount: 50 },
+        { memberId: 'm1', amount: 50 },
+      ], '生活用品'),
+      advance('2', 'm2', [
+        { memberId: 'm2', amount: 50 },
+        { memberId: 'm1', amount: 50 },
+      ], '晚餐'),
+      advance('3', 'm1', [
+        { memberId: 'm1', amount: 275 },
+        { memberId: 'm2', amount: 275 },
+      ], '雜項'),
+    ];
+
+    const net = netBalances(txs);
+    const edge = net.find(
+      (e) =>
+        (e.fromId === 'm1' && e.toId === 'm2') ||
+        (e.fromId === 'm2' && e.toId === 'm1')
+    );
+
+    expect(edge).toBeDefined();
+    expect(edge!.fromId).toBe('m1');
+    expect(edge!.toId).toBe('m2');
+    expect(edge!.amount).toBe(161);
+  });
+
+  it('signedImpactOnMember uses payer net for advances', () => {
+    const tx = advance('1', 'm1', [
+      { memberId: 'm1', amount: 275 },
+      { memberId: 'm2', amount: 275 },
+    ], '雜項');
+
+    expect(signedImpactOnMember(tx, 'm1')).toBe(275);
+    expect(signedImpactOnMember(tx, 'm2')).toBe(-275);
+  });
+
+  it('creditorsOwedByMember returns net amount per creditor', () => {
+    const txs: Transaction[] = [
+      advance('1', 'm2', [
+        { memberId: 'm2', amount: 89 },
+        { memberId: 'm1', amount: 89 },
+      ], '生活用品'),
+      advance('2', 'm2', [
+        { memberId: 'm2', amount: 129 },
+        { memberId: 'm1', amount: 129 },
+      ], '晚餐'),
+      advance('3', 'm1', [
+        { memberId: 'm1', amount: 275 },
+        { memberId: 'm2', amount: 275 },
+      ], '雜項'),
+    ];
+
+    const rows = creditorsOwedByMember(txs, 'm1');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].toId).toBe('m2');
+    expect(rows[0].amount).toBe(161);
+  });
+
+  it('memberNetBalance nets debts and receivables', () => {
+    const txs: Transaction[] = [
+      advance('1', 'm2', [
+        { memberId: 'm2', amount: 100 },
+        { memberId: 'm1', amount: 100 },
+      ], '欠 m2'),
+      advance('2', 'm1', [
+        { memberId: 'm1', amount: 60 },
+        { memberId: 'm3', amount: 60 },
+      ], 'm3 欠 m1'),
+    ];
+
+    expect(memberNetBalance(txs, 'm1')).toBe(-40);
+    expect(memberNetBalance(txs, 'm3')).toBe(-60);
+    expect(memberNetBalance(txs, 'm2')).toBe(100);
+  });
+
+  it('signedImpactOnPair isolates transfer edges per counterparty', () => {
+    const transfer: Transaction = {
+      id: 't1',
+      accountId: 'default',
+      type: 'transfer',
+      title: '債務轉移',
+      totalAmount: 1000,
+      payerId: 'm1',
+      status: 'active',
+      createdBy: 'm1',
+      createdAt: '2025-01-03T00:00:00.000Z',
+      updatedAt: '2025-01-03T00:00:00.000Z',
+      participants: [],
+      transferEdges: [
+        { fromId: 'm1', toId: 'm2', amount: 400 },
+        { fromId: 'm3', toId: 'm1', amount: 576 },
+        { fromId: 'm4', toId: 'm1', amount: 276 },
+      ],
+    };
+
+    expect(signedImpactOnMember(transfer, 'm1')).toBe(452);
+    expect(signedImpactOnPair(transfer, 'm1', 'm2')).toBe(-400);
+    expect(signedImpactOnPair(transfer, 'm1', 'm3')).toBe(576);
+    expect(signedImpactOnPair(transfer, 'm1', 'm4')).toBe(276);
+  });
 });
 
 describe('transactionsBetweenMembers', () => {
@@ -106,6 +247,26 @@ describe('transactionsBetweenMembers', () => {
 
   it('includes repayment between pair', () => {
     const txs: Transaction[] = [repayment('1', 'm1', 'm2', 100)];
+    expect(transactionsBetweenMembers(txs, 'm1', 'm2').length).toBe(1);
+  });
+
+  it('includes transfer edge between pair', () => {
+    const txs: Transaction[] = [
+      {
+        id: 't1',
+        accountId: 'default',
+        type: 'transfer',
+        title: '債務轉移',
+        totalAmount: 100,
+        payerId: 'm2',
+        status: 'active',
+        createdBy: 'm2',
+        createdAt: '2025-01-03T00:00:00.000Z',
+        updatedAt: '2025-01-03T00:00:00.000Z',
+        participants: [],
+        transferEdges: [{ fromId: 'm1', toId: 'm2', amount: 100 }],
+      },
+    ];
     expect(transactionsBetweenMembers(txs, 'm1', 'm2').length).toBe(1);
   });
 });
