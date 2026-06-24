@@ -1,4 +1,7 @@
     <div class="page" *ngIf="vm$ | async as vm">
+      <app-skeleton *ngIf="!vm.dataReady" preset="detail" />
+
+      <ng-container *ngIf="vm.dataReady">
       <ng-container *ngIf="vm.tx as tx; else notFound">
       <a routerLink="/transactions" class="back-link">← 返回</a>
 
@@ -188,5 +191,6 @@
         <a routerLink="/transactions" class="back-link">← 返回</a>
         <p class="helper-text mt-4 text-center">{{ empty.recordNotFound }}</p>
       </ng-template>
+      </ng-container>
     </div>
   

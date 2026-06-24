@@ -51,11 +51,31 @@
 }
 
 .dashboard-hero__pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   border-radius: var(--radius-md);
   padding: var(--space-3);
   text-align: center;
   background: var(--color-surface);
+  border: none;
+  font: inherit;
+  color: inherit;
+  transition: transform var(--duration-fast) var(--ease-default);
   @include border-subtle(var(--theme-peach), 22%);
+
+  &:not(:disabled) {
+    cursor: pointer;
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
 
   &--owe {
     background: color-mix(in srgb, var(--theme-coral) 12%, var(--color-surface));
@@ -72,6 +92,22 @@
   display: block;
   font-size: var(--font-size-xs);
   @include text-secondary;
+}
+
+.dashboard-hero__pill-avatars {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+.dashboard-hero__pill-avatar {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px var(--color-surface);
+
+  & + & {
+    margin-left: calc(var(--space-1) * -1);
+  }
 }
 
 .dashboard-hero__pill-value {
@@ -154,12 +190,25 @@
   text-align: left;
   font: inherit;
   color: inherit;
+  cursor: pointer;
+
+  &:active {
+    opacity: 0.92;
+  }
 }
 
 .dashboard-settlement-row__amount {
   flex-shrink: 0;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
   @include tabular-amount;
+}
+
+.dashboard-settlement-row__chevron {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--color-text-muted);
 }
 
 .dashboard-settlement-row__link {

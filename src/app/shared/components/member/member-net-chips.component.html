@@ -1,34 +1,76 @@
-    <div
-      *ngIf="rows.length > 0"
-      class="member-net-chips"
-      [class.mt-3]="!compact"
-      [style.--member-net-cols]="columnCount"
-    >
+    <ng-container *ngIf="rows.length > 0">
       <div
-        *ngFor="let row of rows"
-        class="member-net-chip"
-        [class.text-debt]="rowAmount(row) < 0"
-        [class.text-positive]="rowAmount(row) > 0"
-        [style.background-color]="
-          memberColorSoftBg(auth.getMember(row.memberId)?.color || '')
-        "
-        [style.box-shadow]="
-          'inset 0 0 0 1px ' +
-          memberColorBorder(auth.getMember(row.memberId)?.color || '')
-        "
+        *ngIf="layout === 'grid'"
+        class="member-net-chips"
+        [class.mt-3]="!compact"
+        [style.--member-net-cols]="columnCount"
       >
-        <app-member-avatar
-          *ngIf="auth.getMember(row.memberId) as member"
-          [member]="member"
-          size="xs"
-        />
-        <span *ngIf="showName" class="member-net-chip__name">{{
-          memberName(row.memberId)
-        }}</span>
-        <span class="member-net-chip__amount">
-          <ng-container *ngIf="rowAmount(row) < 0">{{ formatOwe(-rowAmount(row)) }}</ng-container>
-          <ng-container *ngIf="rowAmount(row) > 0">{{ formatOwed(rowAmount(row)) }}</ng-container>
-        </span>
+        <div
+          *ngFor="let row of rows"
+          class="member-net-chip"
+          [class.text-debt]="rowAmount(row) < 0"
+          [class.text-positive]="rowAmount(row) > 0"
+          [style.background-color]="
+            memberColorSoftBg(auth.getMember(row.memberId)?.color || '')
+          "
+          [style.box-shadow]="
+            'inset 0 0 0 1px ' +
+            memberColorBorder(auth.getMember(row.memberId)?.color || '')
+          "
+        >
+          <app-member-avatar
+            *ngIf="auth.getMember(row.memberId) as member"
+            [member]="member"
+            size="xs"
+          />
+          <span *ngIf="showName" class="member-net-chip__name">{{
+            memberName(row.memberId)
+          }}</span>
+          <span class="member-net-chip__amount">
+            <ng-container *ngIf="rowAmount(row) < 0">{{ formatOwe(-rowAmount(row)) }}</ng-container>
+            <ng-container *ngIf="rowAmount(row) > 0">+{{ formatOwed(rowAmount(row)) }}</ng-container>
+          </span>
+        </div>
       </div>
-    </div>
-  
+
+      <div *ngIf="layout === 'stack'" class="member-net-stack">
+        <div
+          *ngFor="let row of rows"
+          class="member-net-stack__row"
+          [class.text-debt]="rowAmount(row) < 0"
+          [class.text-positive]="rowAmount(row) > 0"
+          [style.background-color]="
+            memberColorSoftBg(auth.getMember(row.memberId)?.color || '')
+          "
+          [style.box-shadow]="
+            'inset 0 0 0 1px ' +
+            memberColorBorder(auth.getMember(row.memberId)?.color || '')
+          "
+        >
+          <app-member-avatar
+            *ngIf="auth.getMember(row.memberId) as member"
+            [member]="member"
+            size="sm"
+          />
+          <div class="member-net-stack__info min-w-0">
+            <span class="member-net-stack__name">{{ memberName(row.memberId) }}</span>
+            <span
+              class="member-net-stack__badge"
+              [class.member-net-stack__badge--payer]="rowStackBadgeKind(row) === 'payer'"
+              [class.member-net-stack__badge--debtor]="rowStackBadgeKind(row) === 'debtor'"
+              [class.member-net-stack__badge--placeholder]="!rowStackBadgeKind(row)"
+            >
+              <ng-container [ngSwitch]="rowStackBadgeKind(row)">
+                <ng-container *ngSwitchCase="'payer'">{{ payerBadge }}</ng-container>
+                <ng-container *ngSwitchCase="'debtor'">{{ debtorBadge }}</ng-container>
+                <ng-container *ngSwitchDefault>&#8203;</ng-container>
+              </ng-container>
+            </span>
+          </div>
+          <span class="member-net-stack__amount">
+            <ng-container *ngIf="rowAmount(row) < 0">{{ formatOwe(-rowAmount(row)) }}</ng-container>
+            <ng-container *ngIf="rowAmount(row) > 0">+{{ formatOwed(rowAmount(row)) }}</ng-container>
+          </span>
+        </div>
+      </div>
+    </ng-container>

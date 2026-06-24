@@ -21,6 +21,7 @@ import { InterestEstimateComponent } from './interest-estimate.component';
 import { ViewSwitchComponent } from '../form/view-switch.component';
 import { InlineTransactionListComponent } from './inline-transaction-list.component';
 import { COPY_ACTIONS, COPY_EMPTY, COPY_PAGES } from '../../../copy';
+import { sheetOverlay, sheetPanel } from '../../../animations/route.animations';
 
 export interface SettlementPairRow {
   otherId: string;
@@ -50,7 +51,7 @@ export interface PairSettlementView {
     InlineTransactionListComponent,
   ],
   templateUrl: './settlement-sheet.component.html',
-
+  animations: [sheetOverlay, sheetPanel],
 })
 export class SettlementSheetComponent implements OnChanges {
   empty = COPY_EMPTY;
@@ -114,10 +115,9 @@ export class SettlementSheetComponent implements OnChanges {
     return this.settlementRows.filter((row) => row.direction === 'owe');
   }
 
-  /** 淨待結算中尚欠的金額（用於利息試算本金） */
-  get settlementNetDebt(): number {
-    const net = this.settlementNetTotal;
-    return net < 0 ? -net : 0;
+  /** 待結算金額絕對值（欠你或你欠，皆可用於利息試算） */
+  get settlementInterestPrincipal(): number {
+    return Math.abs(this.settlementNetTotal);
   }
 
   /** @deprecated 使用 settlementNetTotal */

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { combineLatest, map } from 'rxjs';
@@ -34,12 +34,15 @@ import {
   SettlementPairRow,
   SettlementSheetComponent,
 } from '../../shared/components/ledger/settlement-sheet.component';
+import { SkeletonComponent } from '../../shared/components/motion/skeleton.component';
 import {
   COPY_ACTIONS,
   COPY_EMPTY,
   COPY_PAGES,
   COPY_TERMS,
 } from '../../copy';
+import { prefetchTransactionCreateRoute } from '../../core/routing/lazy-routes';
+import { sheetOverlay, sheetPanel } from '../../animations/route.animations';
 
 interface LatestEntry {
   tx: Transaction;
@@ -51,7 +54,6 @@ interface DashboardHero {
   totalOwed: number;
   netBalance: number;
   isClear: boolean;
-  primaryOwe: SettlementEntry | null;
 }
 
 @Component({
@@ -64,10 +66,12 @@ interface DashboardHero {
     TransactionDatePipe,
     KaomojiDecoComponent,
     SettlementSheetComponent,
+    SkeletonComponent,
   ],
   templateUrl: './dashboard.component.html',
+  animations: [sheetOverlay, sheetPanel],
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   actions = COPY_ACTIONS;
   pages = COPY_PAGES;
   terms = COPY_TERMS;
@@ -90,30 +94,39 @@ export class DashboardComponent {
   sheetSettlementRows: SettlementPairRow[] = [];
   sheetPair: PairSettlementView | null = null;
   sheetTransactions: Transaction[] = [];
+  settlementPickerOpen = false;
+  settlementPickerTitle = '';
+  settlementPickerRows: SettlementEntry[] = [];
+  private settlementPickerActive: Transaction[] = [];
+  private settlementPickerMemberId = '';
 
   vm$ = combineLatest([
     this.transactions.transactions$,
     this.auth.currentMember$,
+    this.transactions.dataReady$,
   ]).pipe(
-    map(([transactions, member]) => {
+    map(([transactions, member, dataReady]) => {
       const active = activeTransactions(transactions);
       const memberId = member?.id ?? '';
 
       const mySettlements = memberId
         ? settlementsForMember(active, memberId)
         : [];
-      const totalOwe = mySettlements
+      const byAmountDesc = (a: SettlementEntry, b: SettlementEntry) =>
+        b.amount - a.amount;
+      const oweSettlements = mySettlements
         .filter((s) => s.direction === 'owe')
-        .reduce((sum, s) => sum + s.amount, 0);
-      const totalOwed = mySettlements
+        .sort(byAmountDesc);
+      const owedSettlements = mySettlements
         .filter((s) => s.direction === 'owed')
-        .reduce((sum, s) => sum + s.amount, 0);
+        .sort(byAmountDesc);
+      const totalOwe = oweSettlements.reduce((sum, s) => sum + s.amount, 0);
+      const totalOwed = owedSettlements.reduce((sum, s) => sum + s.amount, 0);
       const hero: DashboardHero = {
         totalOwe,
         totalOwed,
         netBalance: totalOwed - totalOwe,
         isClear: mySettlements.length === 0,
-        primaryOwe: mySettlements.find((s) => s.direction === 'owe') ?? null,
       };
 
       const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => ({
@@ -123,9 +136,12 @@ export class DashboardComponent {
 
       return {
         memberId,
+        dataReady,
         activeTransactions: active,
         hero,
         mySettlements,
+        oweSettlements,
+        owedSettlements,
         debtRanking: totalDebtRanking(active).slice(0, 3),
         myDebtors: memberId ? debtorsToCreditor(active, memberId) : [],
         latestEntries,
@@ -137,6 +153,10 @@ export class DashboardComponent {
     public auth: AuthService,
     private transactions: TransactionService
   ) {}
+
+  ngOnInit(): void {
+    prefetchTransactionCreateRoute();
+  }
 
   rankMedal(index: number): string {
     return ['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`;
@@ -218,6 +238,7 @@ export class DashboardComponent {
     memberId: string,
     settlement: SettlementEntry
   ): void {
+    this.closeSettlementPicker();
     const name = this.auth.getMember(settlement.otherId)?.name ?? '';
     this.sheetMode = 'pair';
     this.sheetTitle = this.pages.settlementWith(name);
@@ -259,5 +280,38 @@ export class DashboardComponent {
 
   closeSheet(): void {
     this.sheetOpen = false;
+  }
+
+  onHeroSettlementTap(
+    direction: 'owe' | 'owed',
+    settlements: SettlementEntry[],
+    active: Transaction[],
+    memberId: string
+  ): void {
+    if (settlements.length === 0) return;
+
+    if (settlements.length === 1) {
+      this.openPairSettlement(active, memberId, settlements[0]);
+      return;
+    }
+
+    this.settlementPickerTitle =
+      direction === 'owe' ? this.pages.pickSettlementOwe : this.pages.pickSettlementOwed;
+    this.settlementPickerRows = settlements;
+    this.settlementPickerActive = active;
+    this.settlementPickerMemberId = memberId;
+    this.settlementPickerOpen = true;
+  }
+
+  pickSettlement(settlement: SettlementEntry): void {
+    this.openPairSettlement(
+      this.settlementPickerActive,
+      this.settlementPickerMemberId,
+      settlement
+    );
+  }
+
+  closeSettlementPicker(): void {
+    this.settlementPickerOpen = false;
   }
 }

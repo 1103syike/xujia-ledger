@@ -16,6 +16,7 @@ export const COPY_ACTIONS = {
   cancelRecord: '取消這筆',
   goRepay: '去還款',
   goLedgerSelect: '去帳本勾選',
+  continueLedgerSelect: '繼續勾選',
   viewAll: '看全部',
   viewRecord: '看這筆',
   back: '← 返回',

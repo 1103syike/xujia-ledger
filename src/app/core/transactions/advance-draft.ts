@@ -43,6 +43,29 @@ export function inferSplitRuleFromTransaction(tx: Transaction): {
   };
 }
 
+/** 依草稿狀態推斷後端 split 模式（UI 不讓使用者選） */
+export function inferSplitDraftMode(params: {
+  allMemberIds: string[];
+  excludedMemberIds: string[];
+  totalAmount: number;
+  manualAmounts: Record<string, number>;
+  memberItems: Record<string, unknown[]>;
+  splitLockedIds: string[];
+}): { splitRule: SplitRule; customInputMethod: CustomInputMethod } {
+  const hasLineItems = Object.values(params.memberItems).some(
+    (items) => items.length > 0
+  );
+  if (hasLineItems) {
+    return { splitRule: 'custom', customInputMethod: 'lineItems' };
+  }
+
+  if (params.splitLockedIds.length === 0 && params.totalAmount > 0) {
+    return { splitRule: 'equal', customInputMethod: 'lineItems' };
+  }
+
+  return { splitRule: 'custom', customInputMethod: 'direct' };
+}
+
 export function computeStickySummary(
   splitTotal: number,
   payers: AdvancePayer[]

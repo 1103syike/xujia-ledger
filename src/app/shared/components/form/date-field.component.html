@@ -1,20 +1,19 @@
-    <div class="field-group">
+    <div class="field-group date-field-wrap" #root>
       <label class="field-label">{{ label }}</label>
-      <div class="date-field">
+      <button
+        type="button"
+        class="date-field"
+        [disabled]="disabled"
+        [attr.aria-expanded]="open"
+        aria-haspopup="dialog"
+        (click)="toggleOpen($event)"
+      >
         <span
           class="date-field__display min-w-0 truncate"
           [class.date-field__display--empty]="!value"
         >
           {{ displayLabel }}
         </span>
-        <input
-          type="date"
-          class="date-field__input"
-          [value]="value"
-          [disabled]="disabled"
-          (input)="onInput($event)"
-          (blur)="onTouched()"
-        />
         <svg
           class="date-field__icon"
           viewBox="0 0 20 20"
@@ -27,6 +26,77 @@
             clip-rule="evenodd"
           />
         </svg>
+      </button>
+
+      <div
+        *ngIf="open"
+        class="date-picker"
+        role="dialog"
+        aria-label="選擇日期"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="date-picker__header">
+          <button
+            type="button"
+            class="date-picker__nav date-picker__nav--prev"
+            aria-label="上個月"
+            (click)="prevMonth($event)"
+          >
+            <svg class="date-picker__nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+          <p class="date-picker__title">{{ monthTitle }}</p>
+          <button
+            type="button"
+            class="date-picker__nav date-picker__nav--next"
+            aria-label="下個月"
+            (click)="nextMonth($event)"
+          >
+            <svg class="date-picker__nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="date-picker__weekdays" aria-hidden="true">
+          <span *ngFor="let weekLabel of weekLabels" class="date-picker__weekday">
+            {{ weekLabel }}
+          </span>
+        </div>
+
+        <div class="date-picker__grid">
+          <button
+            *ngFor="let cell of cells"
+            type="button"
+            class="date-picker__day"
+            [class.date-picker__day--muted]="!cell.inMonth"
+            [class.date-picker__day--today]="cell.isToday && !cell.isSelected"
+            [class.date-picker__day--selected]="cell.isSelected"
+            [attr.aria-label]="cell.iso"
+            [attr.aria-pressed]="cell.isSelected"
+            (click)="selectDate(cell.iso, $event)"
+          >
+            {{ cell.day }}
+          </button>
+        </div>
+
+        <div class="date-picker__footer">
+          <button type="button" class="date-picker__action" (click)="clear($event)">
+            清除
+          </button>
+          <button type="button" class="date-picker__action" (click)="pickToday($event)">
+            今天
+          </button>
+        </div>
       </div>
     </div>
   

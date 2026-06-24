@@ -1,0 +1,45 @@
+<ng-container [ngSwitch]="preset">
+  <div *ngSwitchCase="'block'" class="skeleton skeleton--block" aria-hidden="true"></div>
+
+  <div *ngSwitchCase="'tx-card'" class="skeleton-tx-card" aria-hidden="true">
+    <div class="skeleton-tx-card__head">
+      <div class="skeleton skeleton--title"></div>
+      <div class="skeleton skeleton--text" style="width: 4.5rem"></div>
+    </div>
+    <div class="skeleton skeleton--amount" style="width: 5rem"></div>
+    <div class="skeleton skeleton--block"></div>
+    <div class="skeleton skeleton--block" style="height: 2.75rem"></div>
+  </div>
+
+  <div *ngSwitchCase="'tx-list'" class="skeleton-tx-list" aria-hidden="true">
+    <div *ngFor="let _ of repeat(count)" class="skeleton-tx-card">
+      <div class="skeleton-tx-card__head">
+        <div class="skeleton skeleton--title"></div>
+        <div class="skeleton skeleton--text" style="width: 4.5rem"></div>
+      </div>
+      <div class="skeleton skeleton--amount" style="width: 5rem"></div>
+      <div class="skeleton skeleton--block" style="height: 2.75rem"></div>
+    </div>
+  </div>
+
+  <div *ngSwitchCase="'dashboard'" class="skeleton-dashboard" aria-hidden="true">
+    <div class="skeleton-dashboard__hero">
+      <div class="skeleton skeleton--amount" style="width: 45%"></div>
+      <div class="skeleton skeleton--text" style="width: 30%"></div>
+      <div class="skeleton-dashboard__pills">
+        <div class="skeleton skeleton--block"></div>
+        <div class="skeleton skeleton--block"></div>
+      </div>
+    </div>
+    <div class="skeleton skeleton--block" style="height: 5rem"></div>
+    <div class="skeleton skeleton--block" style="height: 5rem"></div>
+  </div>
+
+  <div *ngSwitchCase="'detail'" class="skeleton-detail" aria-hidden="true">
+    <div class="skeleton skeleton--title" style="width: 65%"></div>
+    <div class="skeleton skeleton--text" style="width: 40%"></div>
+    <div class="skeleton skeleton--block" style="height: 6rem"></div>
+    <div class="skeleton skeleton--block" style="height: 4rem"></div>
+    <div class="skeleton skeleton--block" style="height: 4rem"></div>
+  </div>
+</ng-container>

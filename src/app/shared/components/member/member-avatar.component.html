@@ -1,16 +1,31 @@
-    <img
-      *ngIf="slotImageSrc; else chibiTpl"
-      class="member-avatar-photo"
-      [src]="slotImageSrc"
-      [attr.width]="pixelSize"
-      [attr.height]="pixelSize"
-      [attr.alt]="member.name"
-    />
-    <ng-template #chibiTpl>
-      <app-member-chibi-head
-        [chibiId]="chibiId"
-        [name]="member.name"
-        [size]="pixelSize"
-      />
-    </ng-template>
-  
+<div
+  class="member-avatar"
+  [style.--member-avatar-size.px]="pixelSize"
+  [attr.aria-busy]="photoLoading ? true : null"
+>
+  <span
+    *ngIf="showSkeleton"
+    class="member-avatar__skeleton skeleton"
+    aria-hidden="true"
+  ></span>
+
+  <img
+    #photoImg
+    *ngIf="slotImageSrc"
+    class="member-avatar-photo"
+    [class.member-avatar-photo--ready]="imageReady"
+    [src]="slotImageSrc"
+    [attr.width]="pixelSize"
+    [attr.height]="pixelSize"
+    [attr.alt]="member.name"
+    (load)="onPhotoLoad()"
+    (error)="onPhotoError()"
+  />
+
+  <app-member-chibi-head
+    *ngIf="showChibi"
+    [chibiId]="chibiId"
+    [name]="member.name"
+    [size]="pixelSize"
+  />
+</div>

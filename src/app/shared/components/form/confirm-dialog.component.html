@@ -8,20 +8,22 @@
     >
       <button
         type="button"
-        class="absolute inset-0 bg-ink/25 backdrop-blur-[2px]"
+        class="absolute inset-0 bg-ink/25 backdrop-blur-[2px] motion-overlay"
+        [@dialogOverlay]
         aria-label="取消"
         (click)="cancel()"
       ></button>
 
       <div
-        class="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl"
+        class="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl motion-dialog-panel"
+        [@dialogPanel]
         (click)="$event.stopPropagation()"
       >
         <p [id]="titleId" class="section-title">{{ title }}</p>
         <p *ngIf="detail" class="item-title mt-2">{{ detail }}</p>
         <p [id]="messageId" class="helper-text mt-2">{{ message }}</p>
 
-        <div class="mt-5 flex gap-2">
+        <div class="mt-5 flex gap-2" *ngIf="!stayPrimary; else stayPrimaryActions">
           <button
             type="button"
             class="btn-secondary btn-sm flex-1"
@@ -41,6 +43,26 @@
             {{ busy ? busyLabel : confirmLabel }}
           </button>
         </div>
+
+        <ng-template #stayPrimaryActions>
+          <div class="mt-5 flex gap-2">
+            <button
+              type="button"
+              class="btn-danger btn-sm flex-1"
+              [disabled]="busy"
+              (click)="confirm()"
+            >
+              {{ discardLabel }}
+            </button>
+            <button
+              type="button"
+              class="btn-primary btn-sm flex-1"
+              [disabled]="busy"
+              (click)="cancel()"
+            >
+              {{ stayLabel }}
+            </button>
+          </div>
+        </ng-template>
       </div>
     </div>
-  

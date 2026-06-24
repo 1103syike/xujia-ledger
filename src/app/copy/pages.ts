@@ -47,6 +47,8 @@ export const COPY_PAGES = {
   settlementsWith: '跟誰有帳',
   settlementsEmpty: '目前沒有跟任何人的往來帳款',
   priorityRepay: (name: string, amount: string) => `優先還給 ${name} ${amount}`,
+  pickSettlementOwe: '你欠誰？',
+  pickSettlementOwed: '誰欠你？',
   currentLedger: '目前帳務',
   rankEmpty: '目前沒有人淨欠款，大家很乖',
   remindEmpty: '目前沒有人欠你，不用催',

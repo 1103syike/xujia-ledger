@@ -1,43 +1,63 @@
 import { Transaction } from '../models';
-import { formatLocalDate, normalizeTransactionDate, todayLocalDate } from '../transactions/transaction-date';
+import {
+  compareTransactionsByDate,
+  formatLocalDate,
+  normalizeTransactionDate,
+} from './transaction-date';
 
-export type TransactionDateGroup = 'today' | 'yesterday' | 'earlier';
+export type TransactionDateGroup = 'today' | 'yesterday' | 'later' | 'earlier';
 
-export function yesterdayLocalDate(): string {
-  const d = new Date();
+export function yesterdayLocalDate(ref: Date = new Date()): string {
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
   d.setDate(d.getDate() - 1);
   return formatLocalDate(d);
 }
 
-export function transactionDateGroup(date: string): TransactionDateGroup {
-  const today = todayLocalDate();
+export function transactionDateGroup(
+  date: string,
+  ref: Date = new Date()
+): TransactionDateGroup {
+  const today = formatLocalDate(ref);
   if (date === today) return 'today';
-  if (date === yesterdayLocalDate()) return 'yesterday';
+  if (date === yesterdayLocalDate(ref)) return 'yesterday';
+  if (date > today) return 'later';
   return 'earlier';
 }
 
 export function transactionDateGroupLabel(group: TransactionDateGroup): string {
   switch (group) {
     case 'today':
-      return '今天';
+      return '本日';
     case 'yesterday':
-      return '昨天';
+      return '昨日';
+    case 'later':
+      return '之後';
     default:
       return '更早';
   }
 }
 
 export function groupByTransactionDate<T extends { tx: Transaction }>(
-  items: T[]
+  items: T[],
+  ref: Date = new Date()
 ): Array<{ group: TransactionDateGroup; label: string; items: T[] }> {
-  const order: TransactionDateGroup[] = ['today', 'yesterday', 'earlier'];
+  const order: TransactionDateGroup[] = [
+    'later',
+    'today',
+    'yesterday',
+    'earlier',
+  ];
   const buckets = new Map<TransactionDateGroup, T[]>(
     order.map((g) => [g, []])
   );
 
   for (const item of items) {
     const date = normalizeTransactionDate(item.tx);
-    buckets.get(transactionDateGroup(date))!.push(item);
+    buckets.get(transactionDateGroup(date, ref))!.push(item);
+  }
+
+  for (const bucket of buckets.values()) {
+    bucket.sort((a, b) => compareTransactionsByDate(a.tx, b.tx));
   }
 
   return order
@@ -47,6 +67,13 @@ export function groupByTransactionDate<T extends { tx: Transaction }>(
       label: transactionDateGroupLabel(g),
       items: buckets.get(g)!,
     }));
+}
+
+/** 整合勾選列用：6/23 */
+export function formatTransactionPickDate(tx: Transaction): string {
+  const date = normalizeTransactionDate(tx);
+  const [, m, d] = date.split('-');
+  return `${Number(m)}/${Number(d)}`;
 }
 
 /** 紀錄卡片用：6/23 14:25 */

@@ -1,4 +1,4 @@
-    <div class="mx-auto flex min-h-full max-w-md flex-col bg-cream pb-20">
+    <div class="mx-auto flex min-h-full max-w-md flex-col bg-cream" [class.pb-20]="!hideBottomNav">
       <header
         class="sticky top-0 z-10 transition-[background-color,box-shadow,border-color] duration-200"
         [ngClass]="
@@ -46,69 +46,140 @@
                   許家帳本
                 </p>
               </div>
-              <a
-                routerLink="/settings"
-                class="inline-flex shrink-0 items-center justify-center leading-none transition-[width,height,font-size,background-color,border-radius] duration-200 active:scale-95"
-                [class.h-8]="headerCompact"
-                [class.w-8]="headerCompact"
-                [class.text-base]="headerCompact"
-                [class.h-10]="!headerCompact"
-                [class.w-10]="!headerCompact"
-                [class.rounded-2xl]="!headerCompact"
-                [class.bg-cream]="!headerCompact"
-                [class.text-lg]="!headerCompact"
-                aria-label="設定"
-              >
-                ⚙️
-              </a>
             </ng-container>
           </div>
         </div>
       </header>
 
       <main class="flex-1 px-4 pt-3">
-        <router-outlet />
+        <div
+          class="page-outlet page-outlet--route"
+          [style.min-height]="routeOutletMinHeight"
+          [@routeTabSlide]="{
+            value: routeAnimationState(),
+            params: routeAnimationParams()
+          }"
+          (@routeTabSlide.start)="onRouteAnimStart($event)"
+          (@routeTabSlide.done)="onRouteAnimDone()"
+        >
+          <router-outlet />
+        </div>
       </main>
 
       <nav
-        class="fixed bottom-0 left-0 right-0 mx-auto max-w-md border-t border-peach/20 bg-white/95 backdrop-blur"
+        *ngIf="!hideBottomNav"
+        class="bottom-nav-bar fixed bottom-0 left-0 right-0 mx-auto max-w-md border-t border-peach/20 bg-white/95 backdrop-blur"
         style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
       >
-        <div class="bottom-nav grid gap-1 px-2 py-2">
+        <div
+          class="bottom-nav grid px-2 py-2"
+          [style.--bottom-nav-active]="activeTabIndex >= 0 ? activeTabIndex : 0"
+        >
+          <span
+            *ngIf="activeTabIndex >= 0"
+            class="bottom-nav__indicator"
+            aria-hidden="true"
+          ></span>
           <a
             routerLink="/"
             routerLinkActive="bottom-nav__link--active"
             [routerLinkActiveOptions]="{ exact: true }"
-            class="bottom-nav__link"
+            class="bottom-nav__link motion-press"
+            (pointerdown)="onNavPress($event, 0)"
           >
+            <span
+              class="bottom-nav__ripple"
+              [class.bottom-nav__ripple--active]="navRippleIndex === 0"
+              aria-hidden="true"
+            ></span>
             <span class="bottom-nav__icon" aria-hidden="true">🏠</span>
             <span class="bottom-nav__label">首頁</span>
           </a>
           <a
             routerLink="/transactions"
             routerLinkActive="bottom-nav__link--active"
-            class="bottom-nav__link"
+            class="bottom-nav__link motion-press"
+            (pointerdown)="onNavPress($event, 1)"
           >
-            <span class="bottom-nav__icon" aria-hidden="true">📝</span>
+            <span
+              class="bottom-nav__ripple"
+              [class.bottom-nav__ripple--active]="navRippleIndex === 1"
+              aria-hidden="true"
+            ></span>
+            <span class="bottom-nav__icon" aria-hidden="true">📒</span>
             <span class="bottom-nav__label">{{ nav.ledger }}</span>
-          </a>
-          <a
-            routerLink="/transactions/new"
-            routerLinkActive="bottom-nav__link--active"
-            class="bottom-nav__link"
-          >
-            <span class="bottom-nav__icon" aria-hidden="true">➕</span>
-            <span class="bottom-nav__label">{{ nav.addRecord }}</span>
           </a>
           <a
             routerLink="/audit"
             routerLinkActive="bottom-nav__link--active"
-            class="bottom-nav__link"
+            class="bottom-nav__link motion-press"
+            (pointerdown)="onNavPress($event, 2)"
           >
+            <span
+              class="bottom-nav__ripple"
+              [class.bottom-nav__ripple--active]="navRippleIndex === 2"
+              aria-hidden="true"
+            ></span>
             <span class="bottom-nav__icon" aria-hidden="true">📋</span>
             <span class="bottom-nav__label">{{ nav.changes }}</span>
           </a>
+          <a
+            routerLink="/settings"
+            routerLinkActive="bottom-nav__link--active"
+            class="bottom-nav__link motion-press"
+            (pointerdown)="onNavPress($event, 3)"
+          >
+            <span
+              class="bottom-nav__ripple"
+              [class.bottom-nav__ripple--active]="navRippleIndex === 3"
+              aria-hidden="true"
+            ></span>
+            <span class="bottom-nav__icon" aria-hidden="true">⚙️</span>
+            <span class="bottom-nav__label">{{ nav.settings }}</span>
+          </a>
         </div>
       </nav>
+
+      <a
+        *ngIf="showRecordFab"
+        routerLink="/transactions/new"
+        [queryParams]="addRecordQueryParams"
+        class="record-fab motion-press"
+        [attr.aria-label]="actions.addRecord"
+        (pointerdown)="onRecordFabPress($event)"
+        (pointerenter)="prefetchCreateRoute()"
+        (touchstart)="prefetchCreateRoute()"
+      >
+        <span
+          class="record-fab__ripple"
+          [class.record-fab__ripple--active]="fabRipple"
+          aria-hidden="true"
+        ></span>
+        <span class="record-fab__glyph" aria-hidden="true">
+          <svg
+            class="record-fab__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8 4h8l1.2 2.4H20a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.4A1 1 0 0 1 4 6.4h2.8L8 4z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 9.5v5M9.5 12h5"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <span class="record-fab__text">
+          <span class="record-fab__label">{{ actions.addRecord }}</span>
+          <span class="record-fab__hint">新交易</span>
+        </span>
+      </a>
     </div>
   

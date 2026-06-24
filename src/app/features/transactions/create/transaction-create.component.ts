@@ -8,7 +8,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription, combineLatest, filter, map, startWith, take } from 'rxjs';
+import { Subscription, combineLatest, filter, map, Observable, of, startWith, take } from 'rxjs';
 import {
   CreateAdvanceInput,
   DEFAULT_ACCOUNT_ID,
@@ -36,6 +36,7 @@ import {
   buildAdvanceInputFromDraft,
   computeStickySummary,
   CustomInputMethod,
+  inferSplitDraftMode,
   inferSplitRuleFromTransaction,
   SplitRule,
 } from '../../../core/transactions/advance-draft';
@@ -45,6 +46,16 @@ import {
   primaryPayerId,
 } from '../../../core/transactions/advance-allocation';
 import { filterManualLineItems } from '../../../core/transactions/advance-display';
+import { distributePayerAmounts } from '../../../core/transactions/payer-distribution';
+import { distributeSplitAmounts } from '../../../core/transactions/split-distribution';
+import {
+  dayBeforeYesterdayLocalDate,
+  lastParticipantGroup,
+  participantGroupKey,
+  recentUsedDates,
+  titleSuggestionOptions,
+} from '../../../core/transactions/recent-create-prefs';
+import { yesterdayLocalDate } from '../../../core/transactions/transaction-date-groups';
 import { formatOweAmount } from '../../../core/ledger/settlement-display';
 import { amountViewerOwesOther } from '../../../core/ledger/ledger-calculator';
 import { activeTransactions, formatTransactionDateLabel, todayLocalDate } from '../../../core/transactions/transaction-date';
@@ -62,10 +73,16 @@ import {
   COPY_EMPTY,
   COPY_ERRORS,
   COPY_PAGES,
+  COPY_CREATE,
   COPY_RECORD_TYPE,
   COPY_SPLIT,
   COPY_TERMS,
 } from '../../../copy';
+import { HasUnsavedChanges } from '../../../core/forms/unsaved-changes';
+import {
+  createFormSnapshotsEqual,
+  serializeCreateFormSnapshot,
+} from '../../../core/forms/create-form-snapshot';
 
 type CreateMode = 'advance' | 'repayment' | 'transfer';
 
@@ -77,6 +94,7 @@ interface MemberDraft {
 interface PayerDraft {
   memberId: string;
   amount: string;
+  locked: boolean;
 }
 
 @Component({
@@ -99,12 +117,13 @@ interface PayerDraft {
   templateUrl: './transaction-create.component.html',
 
 })
-export class TransactionCreateComponent implements OnInit, OnDestroy {
+export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsavedChanges {
   actions = COPY_ACTIONS;
   pages = COPY_PAGES;
   terms = COPY_TERMS;
   split = COPY_SPLIT;
   recordType = COPY_RECORD_TYPE;
+  create = COPY_CREATE;
   empty = COPY_EMPTY;
   dialogs = COPY_DIALOGS;
   errors = COPY_ERRORS;
@@ -133,6 +152,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   remainderSeed = '';
   repaymentBalance: number | null = null;
   submitDialogOpen = false;
+  leaveGuardOpen = false;
   submitBusy = false;
   submitDialogTitle = '';
   submitDialogDetail = '';
@@ -148,6 +168,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }> = [];
   payerRows: PayerDraft[] = [];
   addingItemFor: string | null = null;
+  participantTuningOpen = false;
+  activeParticipantKey = '';
+  recentDateOptions: string[] = [];
+  titleSuggestionOptions: string[] = [];
+  private splitLocked = new Set<string>();
+  private initialWithMemberId: string | null = null;
+  private participantPrefsApplied = false;
+  splitAmountInputs: Record<string, string> = {};
   successOpen = false;
   successTitle = '';
   successAmount = 0;
@@ -160,6 +188,12 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   private activeTx: Transaction[] = [];
   private initialRepaymentToId: string | null = null;
   private editHydrated = false;
+  private baselineSnapshot = '';
+  private baselineReady = false;
+  private navigationAllowed = false;
+  private leaveGuardResolver: ((allow: boolean) => void) | null = null;
+  private pendingAfterDiscard: (() => void) | null = null;
+  private transactionsDataReady = false;
 
   constructor(
     public auth: AuthService,
@@ -174,19 +208,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       date: [todayLocalDate(), Validators.required],
       totalAmount: [null, [Validators.min(1)]],
       billTotal: [null, [Validators.min(1)]],
-      note: [''],
     });
-    this.payerRows = [{ memberId: defaultPayer, amount: '' }];
+    this.payerRows = [{ memberId: defaultPayer, amount: '', locked: false }];
     this.repaymentForm = this.fb.group({
-      date: [todayLocalDate(), Validators.required],
       toMemberId: [''],
       amount: [null, [Validators.min(1)]],
-      note: [''],
-    });
-    this.transferForm = this.fb.group({
       date: [todayLocalDate(), Validators.required],
-      note: [''],
     });
+    this.transferForm = this.fb.group({});
     this.remainderSeed = crypto.randomUUID?.() ?? String(Date.now());
     this.reloadMembers();
   }
@@ -215,8 +244,26 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       this.initialRepaymentToId = toParam;
       this.repaymentForm.patchValue({ toMemberId: toParam });
     }
+    const withParam = this.route.snapshot.queryParamMap.get('with');
+    if (withParam) {
+      this.initialWithMemberId = withParam;
+    }
 
     this.subs.push(
+      this.route.queryParamMap.subscribe((params) => {
+        const idsParam = params.get('ids');
+        if (idsParam === null) return;
+        const nextIds = idsParam.split(',').filter(Boolean);
+        const prevKey = this.selectedSourceIds.join(',');
+        const nextKey = nextIds.join(',');
+        if (prevKey !== nextKey) {
+          this.selectedSourceIds = nextIds;
+          this.refreshTransferPreview();
+          if (this.baselineReady && this.mode === 'transfer') {
+            this.captureBaseline();
+          }
+        }
+      }),
       this.auth.currentMember$
         .pipe(
           filter((m): m is DisplayMember => !!m),
@@ -224,30 +271,160 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
         )
         .subscribe((member) => {
           if (this.payerRows.length === 1 && !this.payerRows[0].memberId) {
-            this.payerRows = [{ memberId: member.id, amount: this.payerRows[0].amount }];
+            this.payerRows = [
+              {
+                memberId: member.id,
+                amount: this.payerRows[0].amount,
+                locked: this.payerRows[0].locked,
+              },
+            ];
           }
-          this.refreshPreview();
+          this.refreshPreview({ syncPayers: true });
         }),
       this.advanceForm.valueChanges.subscribe(() => this.refreshPreview()),
       combineLatest([
         this.transactions.transactions$,
         this.auth.currentMember$,
         this.repaymentForm.valueChanges.pipe(startWith(this.repaymentForm.value)),
-      ]).subscribe(([txs, member]) => {
+        this.transactions.dataReady$,
+      ]).subscribe(([txs, member, , dataReady]) => {
+        this.transactionsDataReady = dataReady;
         this.activeTx = activeTransactions(txs);
+        this.refreshCreatePrefs(member?.id);
         this.refreshRepaymentTargets(member?.id);
         this.updateRepaymentBalance(member?.id);
         this.refreshTransferPreview();
+        if (!this.isEditMode && !this.participantPrefsApplied && member) {
+          this.applyInitialParticipantGroup(member.id);
+        }
+        if (dataReady) {
+          this.tryCaptureBaseline();
+        }
       })
     );
-    this.refreshPreview();
+    this.refreshPreview({ syncPayers: true });
   }
 
   ngOnDestroy(): void {
     this.subs.forEach((s) => s.unsubscribe());
   }
 
+  canDeactivate(): Observable<boolean> {
+    return this.promptDiscardIfNeeded();
+  }
+
+  hasUnsavedChanges(): boolean {
+    if (!this.baselineReady || this.navigationAllowed || this.successOpen) {
+      return false;
+    }
+    return !createFormSnapshotsEqual(
+      this.baselineSnapshot,
+      this.serializeCurrentSnapshot()
+    );
+  }
+
+  private promptDiscardIfNeeded(onDiscard?: () => void): Observable<boolean> {
+    if (!this.hasUnsavedChanges()) {
+      onDiscard?.();
+      return of(true);
+    }
+    return new Observable<boolean>((observer) => {
+      this.pendingAfterDiscard = onDiscard ?? null;
+      this.leaveGuardResolver = (allow) => {
+        if (allow) {
+          this.pendingAfterDiscard?.();
+        }
+        this.pendingAfterDiscard = null;
+        this.leaveGuardResolver = null;
+        observer.next(allow);
+        observer.complete();
+      };
+      this.leaveGuardOpen = true;
+    });
+  }
+
+  onLeaveGuardStay(): void {
+    this.leaveGuardOpen = false;
+    this.pendingAfterDiscard = null;
+    this.leaveGuardResolver?.(false);
+  }
+
+  onLeaveGuardDiscard(): void {
+    this.leaveGuardOpen = false;
+    this.leaveGuardResolver?.(true);
+  }
+
+  private tryCaptureBaseline(): void {
+    if (this.baselineReady) return;
+    if (!this.transactionsDataReady) return;
+    if (this.isEditMode && !this.editHydrated) return;
+    if (
+      !this.isEditMode &&
+      this.mode === 'advance' &&
+      !this.participantPrefsApplied
+    ) {
+      return;
+    }
+    this.captureBaseline();
+    this.baselineReady = true;
+  }
+
+  private captureBaseline(): void {
+    this.baselineSnapshot = this.serializeCurrentSnapshot();
+  }
+
+  private serializeCurrentSnapshot(): string {
+    const v = this.advanceForm.value;
+    const repayment = this.repaymentForm.value;
+    return serializeCreateFormSnapshot({
+      mode: this.mode,
+      advance: {
+        title: String(v.title ?? ''),
+        date: String(v.date ?? ''),
+        totalAmount:
+          v.totalAmount === null || v.totalAmount === ''
+            ? null
+            : Number(v.totalAmount),
+        billTotal:
+          v.billTotal === null || v.billTotal === ''
+            ? null
+            : Number(v.billTotal),
+        skippedMembers: [...this.skippedMembers],
+        memberItems: this.pruneSplitItems(),
+        manualAmounts: { ...this.manualAmounts },
+        splitAmountInputs: { ...this.splitAmountInputs },
+        splitLocked: [...this.splitLocked],
+        payerRows: this.payerRows.map((row) => ({
+          memberId: row.memberId,
+          amount: row.amount,
+          locked: row.locked,
+        })),
+        remainderSeed: this.remainderSeed,
+        activeParticipantKey: this.activeParticipantKey,
+      },
+      repayment: {
+        toMemberId: String(repayment.toMemberId ?? ''),
+        amount:
+          repayment.amount === null || repayment.amount === ''
+            ? null
+            : Number(repayment.amount),
+        date: String(repayment.date ?? ''),
+      },
+      transfer: {
+        selectedSourceIds: [...this.selectedSourceIds],
+      },
+    });
+  }
+
   setMode(mode: CreateMode): void {
+    if (mode === this.mode) return;
+    this.promptDiscardIfNeeded(() => {
+      this.applyMode(mode);
+      this.captureBaseline();
+    }).subscribe();
+  }
+
+  private applyMode(mode: CreateMode): void {
     this.mode = mode;
     this.error = '';
     if (mode === 'repayment') {
@@ -261,6 +438,13 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   removeSource(id: string): void {
     this.selectedSourceIds = this.selectedSourceIds.filter((x) => x !== id);
     this.refreshTransferPreview();
+  }
+
+  get consolidateSelectQueryParams(): { consolidate: string; ids: string } {
+    return {
+      consolidate: '1',
+      ids: this.selectedSourceIds.join(','),
+    };
   }
 
   private refreshTransferPreview(): void {
@@ -284,11 +468,35 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   setRepaymentTarget(id: string): void {
     this.repaymentForm.patchValue({ toMemberId: id });
     this.updateRepaymentBalance(this.auth.currentMember?.id);
+    this.syncRepaymentAmountToBalance();
   }
 
-  fillFullRepayment(): void {
+  /** 留空或超過待還 → 結清；否則還輸入金額 */
+  resolveRepaymentAmount(): number {
+    const balance = this.repaymentBalance ?? 0;
+    if (balance <= 0) return 0;
+
+    const raw = this.repaymentForm.value.amount;
+    if (raw === null || raw === '' || raw === undefined) {
+      return balance;
+    }
+
+    const typed = Number(raw);
+    if (!Number.isFinite(typed) || typed <= 0) {
+      return balance;
+    }
+
+    return Math.min(typed, balance);
+  }
+
+  private syncRepaymentAmountToBalance(): void {
     if (this.repaymentBalance && this.repaymentBalance > 0) {
-      this.repaymentForm.patchValue({ amount: this.repaymentBalance });
+      this.repaymentForm.patchValue(
+        { amount: this.repaymentBalance },
+        { emitEvent: false }
+      );
+    } else {
+      this.repaymentForm.patchValue({ amount: null }, { emitEvent: false });
     }
   }
 
@@ -344,9 +552,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     };
 
     if (!current || (oweAmounts[current] ?? 0) <= 0) {
-      this.repaymentForm.patchValue({ toMemberId: pickDefault() }, { emitEvent: true });
+      const nextId = pickDefault();
+      this.repaymentForm.patchValue(
+        { toMemberId: nextId, amount: oweAmounts[nextId] ?? null },
+        { emitEvent: true }
+      );
     }
 
+    this.updateRepaymentBalance(viewerId);
     this.initialRepaymentToId = null;
   }
 
@@ -357,7 +570,15 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   get splitMode(): SplitMode {
-    return this.splitRule === 'equal' ? 'equal' : 'itemized';
+    const inferred = inferSplitDraftMode({
+      allMemberIds: this.members.map((m) => m.id),
+      excludedMemberIds: [...this.skippedMembers],
+      totalAmount: this.effectiveTotal,
+      manualAmounts: this.manualAmounts,
+      memberItems: this.memberItems,
+      splitLockedIds: [...this.splitLocked],
+    });
+    return inferred.splitRule === 'equal' ? 'equal' : 'itemized';
   }
 
   get stickySummary() {
@@ -379,7 +600,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   get equalPerPersonLabel(): string | null {
-    if (this.splitRule !== 'equal' || !this.preview || this.payingCount === 0) {
+    if (!this.preview || this.payingCount === 0) {
       return null;
     }
     const amounts = this.preview.lines
@@ -396,10 +617,168 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     return `每人約 NT$ ${base}（含零頭分配）`;
   }
 
+  get visibleSplitMembers(): DisplayMember[] {
+    if (this.participantTuningOpen) return this.members;
+    return this.members.filter((m) => !this.isSkipped(m.id));
+  }
+
+  get todayDate(): string {
+    return todayLocalDate();
+  }
+
+  get yesterdayDate(): string {
+    return yesterdayLocalDate();
+  }
+
+  get dayBeforeYesterdayDate(): string {
+    return dayBeforeYesterdayLocalDate();
+  }
+
+  isFormDateActive(form: FormGroup, date: string): boolean {
+    return form.value.date === date;
+  }
+
+  formatDateChip(date: string): string {
+    const parts = date.split('-').map(Number);
+    if (parts.length < 3 || !parts[1] || !parts[2]) return date;
+    return `${parts[1]}/${parts[2]}`;
+  }
+
+  pickFormDate(form: FormGroup, date: string): void {
+    form.patchValue({ date });
+  }
+
+  isTitleSuggestionActive(title: string): boolean {
+    return (this.advanceForm.value.title ?? '').trim() === title;
+  }
+
+  pickTitleSuggestion(title: string): void {
+    this.advanceForm.patchValue({ title });
+  }
+
+  isAllGroupActive(): boolean {
+    const participating = this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .map((m) => m.id);
+    return (
+      participantGroupKey(participating) ===
+      participantGroupKey(this.members.map((m) => m.id))
+    );
+  }
+
+  isSingleMemberActive(memberId: string): boolean {
+    const participating = this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .map((m) => m.id);
+    return participating.length === 1 && participating[0] === memberId;
+  }
+
+  selectAllParticipants(): void {
+    this.applyParticipantMemberIds(this.members.map((m) => m.id));
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
+  selectSingleMember(memberId: string): void {
+    this.applyParticipantMemberIds([memberId]);
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
+  toggleParticipantTuning(): void {
+    this.participantTuningOpen = !this.participantTuningOpen;
+  }
+
+  memberHasLineItems(memberId: string): boolean {
+    return (this.memberItems[memberId] ?? []).length > 0;
+  }
+
+  isSplitAmountLocked(memberId: string): boolean {
+    return this.splitLocked.has(memberId) || this.memberHasLineItems(memberId);
+  }
+
+  splitAmountDisplay(memberId: string): string {
+    if (this.splitAmountInputs[memberId] !== undefined) {
+      return this.splitAmountInputs[memberId];
+    }
+    const amount = this.manualAmounts[memberId];
+    return amount ? String(amount) : '';
+  }
+
+  setSplitAmount(memberId: string, value: string): void {
+    if (this.memberHasLineItems(memberId)) return;
+    this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: value };
+  }
+
+  commitSplitAmount(memberId: string): void {
+    if (this.memberHasLineItems(memberId)) return;
+
+    const raw = String(this.splitAmountInputs[memberId] ?? '').trim();
+    if (!raw) {
+      this.splitLocked.delete(memberId);
+      const nextInputs = { ...this.splitAmountInputs };
+      delete nextInputs[memberId];
+      this.splitAmountInputs = nextInputs;
+    } else {
+      const amount = Number(raw) || 0;
+      this.manualAmounts = { ...this.manualAmounts, [memberId]: amount };
+      this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: String(amount) };
+      this.splitLocked.add(memberId);
+    }
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
+  private refreshCreatePrefs(viewerId?: string): void {
+    if (!viewerId) {
+      this.recentDateOptions = [];
+      this.titleSuggestionOptions = [];
+      return;
+    }
+    this.recentDateOptions = recentUsedDates(this.activeTx, viewerId, 3);
+    this.titleSuggestionOptions = titleSuggestionOptions(
+      this.activeTx,
+      viewerId
+    );
+  }
+
+  private applyParticipantMemberIds(memberIds: string[]): void {
+    const allowed = new Set(memberIds);
+    this.skippedMembers = new Set(
+      this.members.filter((m) => !allowed.has(m.id)).map((m) => m.id)
+    );
+    this.activeParticipantKey = participantGroupKey(memberIds);
+    this.splitLocked.clear();
+    this.splitAmountInputs = {};
+    const nextItems: Record<string, LineItem[]> = {};
+    for (const [id, items] of Object.entries(this.memberItems)) {
+      if (allowed.has(id)) nextItems[id] = items;
+    }
+    this.memberItems = nextItems;
+  }
+
+  private applyInitialParticipantGroup(viewerId: string): void {
+    if (this.participantPrefsApplied || this.isEditMode) return;
+
+    const allIds = this.members.map((m) => m.id);
+    let ids: string[];
+
+    if (this.initialWithMemberId && this.initialWithMemberId !== viewerId) {
+      ids = [viewerId, this.initialWithMemberId];
+      this.initialWithMemberId = null;
+    } else {
+      ids = lastParticipantGroup(this.activeTx, viewerId) ?? allIds;
+    }
+
+    this.applyParticipantMemberIds(ids);
+    this.participantPrefsApplied = true;
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+    this.tryCaptureBaseline();
+  }
+
   selectPrimaryPayer(memberId: string): void {
     if (this.payerRows.length === 1) {
-      this.payerRows = [{ memberId, amount: this.payerRows[0].amount }];
-      this.syncSinglePayerAmount();
+      const row = this.payerRows[0];
+      this.payerRows = [
+        { memberId, amount: row.amount, locked: row.locked },
+      ];
       this.refreshPreview();
     }
   }
@@ -419,12 +798,15 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   goToTransactions(): void {
+    this.navigationAllowed = true;
     void this.router.navigateByUrl('/transactions');
   }
 
   createAnother(): void {
     this.successOpen = false;
     this.successImpactLines = [];
+    this.navigationAllowed = false;
+    this.baselineReady = false;
     this.resetAdvanceForm();
   }
 
@@ -435,19 +817,27 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       date: todayLocalDate(),
       totalAmount: null,
       billTotal: null,
-      note: '',
     });
-    this.payerRows = [{ memberId: defaultPayer, amount: '' }];
+    this.payerRows = [{ memberId: defaultPayer, amount: '', locked: false }];
     this.splitRule = 'equal';
     this.customInputMethod = 'lineItems';
     this.memberItems = {};
     this.manualAmounts = {};
+    this.splitAmountInputs = {};
+    this.splitLocked.clear();
+    this.participantTuningOpen = false;
+    this.participantPrefsApplied = false;
     this.skippedMembers = new Set();
     this.addingItemFor = null;
     this.error = '';
     this.remainderSeed = crypto.randomUUID?.() ?? String(Date.now());
     this.initDrafts();
-    this.refreshPreview();
+    const viewerId = this.auth.currentMember?.id;
+    if (viewerId) {
+      this.applyInitialParticipantGroup(viewerId);
+    } else {
+      this.refreshPreview({ syncSplits: true, syncPayers: true });
+    }
   }
 
   private buildPreviewTransaction(): Transaction | null {
@@ -516,26 +906,34 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     const draft = this.memberDrafts[memberId];
     if (!draft) return;
     const amount = Number(draft.amount);
-    const note = draft.note.trim() || '未命名項目';
+    const note = draft.note.trim();
+    if (!note) {
+      this.error = '請填寫項目名稱';
+      return;
+    }
     if (!amount || amount <= 0 || Number.isNaN(amount)) {
       this.error = '請輸入有效的金額';
       return;
     }
     this.error = '';
     this.memberItems = { ...this.memberItems, [memberId]: [...(this.memberItems[memberId] ?? []), { note, amount }] };
+    this.splitLocked.add(memberId);
     draft.note = '';
     draft.amount = '';
     this.addingItemFor = null;
     this.syncAmountsFromItems();
-    this.refreshPreview();
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
   removeMemberItem(memberId: string, index: number): void {
     const next = [...(this.memberItems[memberId] ?? [])];
     next.splice(index, 1);
     this.memberItems = { ...this.memberItems, [memberId]: next };
+    if (next.length === 0) {
+      this.splitLocked.delete(memberId);
+    }
     this.syncAmountsFromItems();
-    this.refreshPreview();
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
   get payerTotal(): number {
@@ -561,17 +959,15 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     );
     this.payerRows = [
       ...this.payerRows,
-      { memberId: available?.id ?? '', amount: '' },
+      { memberId: available?.id ?? '', amount: '', locked: false },
     ];
-    this.syncSinglePayerAmount();
-    this.refreshPreview();
+    this.refreshPreview({ syncPayers: true });
   }
 
   removePayer(index: number): void {
     if (this.payerRows.length <= 1) return;
     this.payerRows = this.payerRows.filter((_, i) => i !== index);
-    this.syncSinglePayerAmount();
-    this.refreshPreview();
+    this.refreshPreview({ syncPayers: true });
   }
 
   setPayerMember(index: number, memberId: string): void {
@@ -585,38 +981,81 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     const next = [...this.payerRows];
     next[index] = { ...next[index], amount: value };
     this.payerRows = next;
-    this.refreshPreview();
   }
 
-  /**
-   * 單人代墊時同步實付金額：
-   * - 細分：實付不足分攤總額時自動補齊；付更多（找錢）則不動
-   * - 平分：僅空欄時預填分攤總額
-   */
-  private syncSinglePayerAmount(): void {
-    if (this.payerRows.length !== 1) return;
-    const total = this.effectiveTotal;
+  commitPayerAmount(index: number): void {
+    const row = this.payerRows[index];
+    if (!row) return;
+
+    const raw = String(row.amount ?? '').trim();
+    const next = [...this.payerRows];
+
+    if (!raw) {
+      next[index] = { ...row, amount: '', locked: false };
+    } else {
+      const amount = Number(raw) || 0;
+      next[index] = { ...row, amount: String(amount), locked: true };
+    }
+
+    this.payerRows = next;
+    this.refreshPreview({ syncPayers: true });
+  }
+
+  onSplitTotalCommit(): void {
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
+  private syncSplitAmounts(): void {
+    const total = Number(this.advanceForm.value.totalAmount) || 0;
     if (total <= 0) return;
-    const row = this.payerRows[0];
-    const current = Number(row.amount) || 0;
-    const isEmpty = !String(row.amount ?? '').trim();
 
-    if (this.splitRule === 'custom') {
-      if (current < total) {
-        this.payerRows = [{ ...row, amount: String(total) }];
+    const participating = this.members.filter((m) => !this.isSkipped(m.id));
+    if (participating.length === 0) return;
+
+    const rows = participating.map((m) => {
+      const items = this.memberItems[m.id] ?? [];
+      const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
+      const locked = items.length > 0 || this.splitLocked.has(m.id);
+      const amount =
+        items.length > 0 ? fromItems : Number(this.manualAmounts[m.id]) || 0;
+      return { amount, locked };
+    });
+
+    const amounts = distributeSplitAmounts(total, rows);
+    const nextManual = { ...this.manualAmounts };
+    const nextInputs = { ...this.splitAmountInputs };
+
+    participating.forEach((m, index) => {
+      nextManual[m.id] = amounts[index];
+      if (!this.splitLocked.has(m.id) && !this.memberHasLineItems(m.id)) {
+        nextInputs[m.id] = String(amounts[index]);
       }
-      return;
-    }
+    });
 
-    if (isEmpty) {
-      this.payerRows = [{ ...row, amount: String(total) }];
-    }
+    this.manualAmounts = nextManual;
+    this.splitAmountInputs = nextInputs;
+  }
+
+  private syncPayerAmounts(): void {
+    const splitTotal = this.computeEffectiveTotal();
+    if (splitTotal <= 0 || this.payerRows.length === 0) return;
+
+    const states = this.payerRows.map((row) => ({
+      amount: Number(row.amount) || 0,
+      locked: row.locked,
+    }));
+    const amounts = distributePayerAmounts(splitTotal, states);
+
+    this.payerRows = this.payerRows.map((row, index) => ({
+      ...row,
+      amount: String(amounts[index]),
+    }));
   }
 
   setPayer(id: string): void {
     if (this.payerRows.length === 1) {
-      this.payerRows = [{ memberId: id, amount: this.payerRows[0].amount }];
-      this.syncSinglePayerAmount();
+      const row = this.payerRows[0];
+      this.payerRows = [{ memberId: id, amount: row.amount, locked: row.locked }];
       this.refreshPreview();
     }
   }
@@ -628,7 +1067,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       this.memberItems = {};
       this.initDrafts();
     }
-    this.refreshPreview();
+    this.refreshPreview({ syncPayers: true });
   }
 
   setCustomInputMethod(method: CustomInputMethod): void {
@@ -642,7 +1081,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       }
     }
     this.customInputMethod = method;
-    this.refreshPreview();
+    this.refreshPreview({ syncPayers: true });
   }
 
   setDirectAmount(memberId: string, value: string | number): void {
@@ -671,18 +1110,32 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       this.skippedMembers.add(id);
       this.manualAmounts[id] = 0;
       this.memberItems = { ...this.memberItems, [id]: [] };
+      this.splitLocked.delete(id);
+      const nextInputs = { ...this.splitAmountInputs };
+      delete nextInputs[id];
+      this.splitAmountInputs = nextInputs;
       if (this.addingItemFor === id) {
         this.addingItemFor = null;
       }
     }
+    const participating = this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .map((m) => m.id);
+    this.activeParticipantKey = participantGroupKey(participating);
     this.syncAmountsFromItems();
-    this.refreshPreview();
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
-  refreshPreview(): void {
+  refreshPreview(options?: { syncPayers?: boolean; syncSplits?: boolean }): void {
     this.syncAmountsFromItems();
+    this.syncTotalAmountFieldFromSplits();
     this.effectiveTotal = this.computeEffectiveTotal();
-    this.syncSinglePayerAmount();
+    if (options?.syncSplits) {
+      this.syncSplitAmounts();
+    }
+    if (options?.syncPayers) {
+      this.syncPayerAmounts();
+    }
     this.chartBillTotal = this.computeChartBillTotal();
     this.payingCount = this.members.filter((m) => !this.isSkipped(m.id)).length;
     const input = this.buildAdvanceInput();
@@ -696,8 +1149,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   submitAdvance(): void {
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
     this.error = this.advanceSubmitHint;
-    if (this.error) return;
+    if (this.error) {
+      if (this.stickySummary.paymentShortfall > 0) {
+        this.scrollToPayerSection();
+      }
+      return;
+    }
 
     if (this.isEditMode) {
       const title = (this.advanceForm.value.title ?? '').trim();
@@ -723,11 +1182,13 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       return;
     }
     const v = this.repaymentForm.value;
-    this.error = validateRepaymentInput(viewer.id, v.toMemberId, Number(v.amount)) ?? '';
+    const amount = this.resolveRepaymentAmount();
+    this.error = validateRepaymentInput(viewer.id, v.toMemberId, amount) ?? '';
     if (this.error) return;
     const toName = this.auth.getMember(v.toMemberId)?.name ?? '';
+    const date = v.date ?? todayLocalDate();
     this.submitDialogTitle = COPY_DIALOGS.addRepaymentTitle;
-    this.submitDialogDetail = `${formatTransactionDateLabel(v.date)} · 還款給 ${toName} · NT$ ${v.amount}`;
+    this.submitDialogDetail = `${formatTransactionDateLabel(date)} · 還款給 ${toName} · NT$ ${amount}`;
     this.submitDialogMessage = COPY_DIALOGS.addRepaymentMessage;
     this.submitDialogOpen = true;
   }
@@ -740,9 +1201,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
         this.members.map((m) => m.id)
       ) ?? '';
     if (this.error) return;
-    const v = this.transferForm.value;
     this.submitDialogTitle = COPY_DIALOGS.consolidateTitle;
-    this.submitDialogDetail = `${formatTransactionDateLabel(v.date)} · ${COPY_RECORD_TYPE.consolidate} · 整合 ${this.selectedSourceIds.length} 筆記錄`;
+    this.submitDialogDetail = `${formatTransactionDateLabel(todayLocalDate())} · ${COPY_RECORD_TYPE.consolidate} · 整合 ${this.selectedSourceIds.length} 筆記錄`;
     this.submitDialogMessage = COPY_DIALOGS.consolidateMessage;
     this.submitDialogOpen = true;
   }
@@ -767,29 +1227,31 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
 
         if (!err && !this.isEditMode && previewTx) {
           this.submitDialogOpen = false;
+          this.navigationAllowed = true;
           await this.router.navigateByUrl('/transactions');
           return;
         }
       } else if (this.mode === 'repayment') {
         const viewer = this.auth.currentMember!;
         const v = this.repaymentForm.value;
+        const amount = this.resolveRepaymentAmount();
         err = await this.transactions.createRepayment({
           fromMemberId: viewer.id,
           toMemberId: v.toMemberId,
-          amount: Number(v.amount),
-          date: v.date,
-          note: v.note || null,
+          amount,
+          date: v.date ?? todayLocalDate(),
+          note: null,
         });
       } else {
-        const v = this.transferForm.value;
         const result = await this.transactions.createTransfer({
-          date: v.date,
-          note: v.note || null,
+          date: todayLocalDate(),
+          note: null,
           sourceTransactionIds: [...this.selectedSourceIds],
         });
         err = result.error;
         if (!err && result.transactionId) {
           this.submitDialogOpen = false;
+          this.navigationAllowed = true;
           await this.router.navigate(['/transactions', result.transactionId]);
           return;
         }
@@ -800,6 +1262,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
         return;
       }
       this.submitDialogOpen = false;
+      this.navigationAllowed = true;
       await this.router.navigateByUrl('/transactions');
     } finally {
       this.submitBusy = false;
@@ -815,52 +1278,60 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
   }
 
   private computeEffectiveTotal(): number {
-    if (this.splitRule === 'equal') {
-      return Number(this.advanceForm.value.totalAmount) || 0;
-    }
-    if (this.customInputMethod === 'direct') {
-      return this.members
-        .filter((m) => !this.isSkipped(m.id))
-        .reduce((sum, m) => sum + (this.manualAmounts[m.id] ?? 0), 0);
-    }
+    const fromField = Number(this.advanceForm.value.totalAmount) || 0;
+    if (fromField > 0) return fromField;
+    return this.sumParticipatingSplits();
+  }
+
+  private sumParticipatingSplits(): number {
     return this.members
       .filter((m) => !this.isSkipped(m.id))
       .reduce((sum, m) => sum + (this.memberSubtotals[m.id] ?? 0), 0);
   }
 
-  private computeChartBillTotal(): number | null {
-    if (this.splitRule === 'equal') {
-      const total = Number(this.advanceForm.value.totalAmount) || 0;
-      return total > 0 ? total : null;
+  /** 逐項記帳時讓消費總額跟品項合計同步；未填總額時亦帶入分攤合計 */
+  private syncTotalAmountFieldFromSplits(): void {
+    const fromSplits = this.sumParticipatingSplits();
+    const hasLineItems = Object.values(this.memberItems).some(
+      (items) => items.length > 0
+    );
+
+    if (hasLineItems) {
+      this.advanceForm.patchValue(
+        { totalAmount: fromSplits > 0 ? fromSplits : null },
+        { emitEvent: false }
+      );
+      return;
     }
+
+    const fromField = Number(this.advanceForm.value.totalAmount) || 0;
+    if (fromField === 0 && fromSplits > 0) {
+      this.advanceForm.patchValue({ totalAmount: fromSplits }, { emitEvent: false });
+    }
+  }
+
+  private computeChartBillTotal(): number | null {
+    const total = Number(this.advanceForm.value.totalAmount) || 0;
     const bill = Number(this.advanceForm.value.billTotal) || 0;
-    return bill > this.effectiveTotal ? bill : null;
+    return bill > total ? bill : total > 0 ? total : null;
   }
 
   private syncAmountsFromItems(): void {
     const subtotals: Record<string, number> = {};
-    const amounts: Record<string, number> = {};
     for (const m of this.members) {
-      if (this.splitRule === 'custom' && this.customInputMethod === 'lineItems') {
-        const subtotal = (this.memberItems[m.id] ?? []).reduce(
-          (sum, item) => sum + item.amount,
-          0
-        );
-        subtotals[m.id] = subtotal;
-        amounts[m.id] = this.isSkipped(m.id) ? 0 : subtotal;
-      } else if (this.splitRule === 'custom' && this.customInputMethod === 'direct') {
-        const amount = this.isSkipped(m.id) ? 0 : (this.manualAmounts[m.id] ?? 0);
-        amounts[m.id] = amount;
-        subtotals[m.id] = amount;
-      } else {
-        amounts[m.id] = this.manualAmounts[m.id] ?? 0;
-        subtotals[m.id] = amounts[m.id];
+      const items = this.memberItems[m.id] ?? [];
+      const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
+      const amount = this.isSkipped(m.id)
+        ? 0
+        : items.length > 0
+          ? fromItems
+          : this.manualAmounts[m.id] ?? 0;
+      subtotals[m.id] = amount;
+      if (!this.isSkipped(m.id)) {
+        this.manualAmounts = { ...this.manualAmounts, [m.id]: amount };
       }
     }
     this.memberSubtotals = subtotals;
-    if (this.splitRule === 'custom') {
-      this.manualAmounts = amounts;
-    }
   }
 
   private buildAdvanceInput(): CreateAdvanceInput {
@@ -872,12 +1343,20 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
         memberId: row.memberId,
         amount: Number(row.amount) || 0,
       }));
+    const inferred = inferSplitDraftMode({
+      allMemberIds: this.members.map((m) => m.id),
+      excludedMemberIds: [...this.skippedMembers],
+      totalAmount: this.effectiveTotal,
+      manualAmounts: this.manualAmounts,
+      memberItems: this.memberItems,
+      splitLockedIds: [...this.splitLocked],
+    });
     return buildAdvanceInputFromDraft({
       title: v.title ?? '',
       date: v.date ?? todayLocalDate(),
-      note: v.note || null,
-      splitRule: this.splitRule,
-      customInputMethod: this.customInputMethod,
+      note: null,
+      splitRule: inferred.splitRule,
+      customInputMethod: inferred.customInputMethod,
       splitTotal: this.effectiveTotal,
       chartBillTotal: this.chartBillTotal,
       payers,
@@ -931,6 +1410,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     }
 
     this.editHydrated = true;
+    this.participantPrefsApplied = true;
     this.mode = 'advance';
     const inferred = inferSplitRuleFromTransaction(tx);
     this.splitRule = inferred.splitRule;
@@ -943,17 +1423,19 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
     this.advanceForm.patchValue({
       title: tx.title,
       date: tx.date ?? todayLocalDate(),
-      totalAmount: this.splitRule === 'equal' ? tx.totalAmount : null,
+      totalAmount: tx.totalAmount,
       billTotal: tx.billTotal ?? null,
-      note: tx.note ?? '',
     });
 
     this.payerRows = getAdvancePayers(tx).map((p) => ({
       memberId: p.memberId,
       amount: String(p.amount),
+      locked: true,
     }));
     if (this.payerRows.length === 0) {
-      this.payerRows = [{ memberId: tx.payerId, amount: String(tx.totalAmount) }];
+      this.payerRows = [
+        { memberId: tx.payerId, amount: String(tx.totalAmount), locked: true },
+      ];
     }
 
     if (this.splitRule === 'custom' && this.customInputMethod === 'lineItems') {
@@ -979,8 +1461,30 @@ export class TransactionCreateComponent implements OnInit, OnDestroy {
       this.manualAmounts = amounts;
     }
 
+    const participating = tx.participants
+      .filter((p) => p.amount > 0)
+      .map((p) => p.memberId);
+    this.applyParticipantMemberIds(participating);
+    this.splitLocked.clear();
+    this.splitAmountInputs = {};
+    if (inferred.splitRule === 'custom') {
+      for (const p of tx.participants) {
+        if (p.amount > 0) {
+          this.splitLocked.add(p.memberId);
+          this.splitAmountInputs[p.memberId] = String(p.amount);
+        }
+      }
+    }
+
     this.initDrafts();
     this.syncAmountsFromItems();
     this.refreshPreview();
+    this.tryCaptureBaseline();
+  }
+
+  private scrollToPayerSection(): void {
+    document
+      .getElementById('payer-section')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }

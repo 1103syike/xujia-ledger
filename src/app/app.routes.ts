@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { unsavedChangesGuard } from './core/guards/unsaved-changes.guard';
+import { loadTransactionCreateComponent } from './core/routing/lazy-routes';
 import { MobileShellComponent } from './layout/mobile-shell.component';
 
 export const routes: Routes = [
@@ -30,18 +32,14 @@ export const routes: Routes = [
       },
       {
         path: 'transactions/new',
-        loadComponent: () =>
-          import('./features/transactions/create/transaction-create.component').then(
-            (m) => m.TransactionCreateComponent
-          ),
+        loadComponent: loadTransactionCreateComponent,
+        canDeactivate: [unsavedChangesGuard],
       },
       {
         path: 'transactions/:id/edit',
-        loadComponent: () =>
-          import('./features/transactions/create/transaction-create.component').then(
-            (m) => m.TransactionCreateComponent
-          ),
+        loadComponent: loadTransactionCreateComponent,
         data: { edit: true },
+        canDeactivate: [unsavedChangesGuard],
       },
       {
         path: 'transactions/:id',

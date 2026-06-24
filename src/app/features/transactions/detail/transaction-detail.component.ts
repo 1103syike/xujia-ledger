@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { map, switchMap } from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { MemberAvatarComponent } from '../../../shared/components/member/member-avatar.component';
@@ -18,6 +18,7 @@ import { LineItem, Transaction, TransactionParticipant, TransferEdge } from '../
 import { InterestEstimateComponent } from '../../../shared/components/ledger/interest-estimate.component';
 import { ViewSwitchComponent } from '../../../shared/components/form/view-switch.component';
 import { TransferBreakdownComponent } from '../../../shared/components/ledger/transfer-breakdown.component';
+import { SkeletonComponent } from '../../../shared/components/motion/skeleton.component';
 import {
   COPY_ACTIONS,
   COPY_DIALOGS,
@@ -52,6 +53,7 @@ interface TransactionDetailVm {
     InterestEstimateComponent,
     ViewSwitchComponent,
     TransferBreakdownComponent,
+    SkeletonComponent,
   ],
   templateUrl: './transaction-detail.component.html',
 
@@ -69,12 +71,15 @@ export class TransactionDetailComponent {
     { id: 'interest', label: '利息試算' },
   ];
 
-  vm$ = this.route.paramMap.pipe(
-    switchMap((params) =>
-      this.transactions.transactions$.pipe(
-        map((list) => this.buildVm(list, params.get('id')))
-      )
-    )
+  vm$ = combineLatest([
+    this.route.paramMap,
+    this.transactions.transactions$,
+    this.transactions.dataReady$,
+  ]).pipe(
+    map(([params, list, dataReady]) => ({
+      ...this.buildVm(list, params.get('id')),
+      dataReady,
+    }))
   );
 
   message = '';

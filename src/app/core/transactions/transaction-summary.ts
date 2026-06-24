@@ -40,6 +40,30 @@ export function formatTransactionStoryLine(
   return '';
 }
 
+/** 整合勾選列：👑 金主 · 其他參與者 */
+export function formatConsolidatePickParticipants(
+  tx: Transaction,
+  nameOf: (id: string) => string,
+  payerBadge: string
+): string {
+  if (tx.type !== 'advance') return '';
+
+  const payerIds = new Set(getAdvancePayers(tx).map((p) => p.memberId));
+  const payerNames = formatAdvancePayerNames(tx, nameOf);
+  const others = tx.participants
+    .filter((p) => p.amount > 0 && !payerIds.has(p.memberId))
+    .map((p) => nameOf(p.memberId));
+
+  const parts: string[] = [];
+  if (payerNames !== '—') {
+    parts.push(`${payerBadge} ${payerNames}`);
+  }
+  if (others.length > 0) {
+    parts.push(others.join(' · '));
+  }
+  return parts.join(' · ');
+}
+
 /** 展開區：分攤描述 */
 export function formatTransactionSplitDetail(
   tx: Transaction,

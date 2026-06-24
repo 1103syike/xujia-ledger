@@ -29,11 +29,14 @@
   border-color: var(--color-brand-peach);
 }
 
-@mixin press-scale($scale: 0.95) {
-  transition: transform var(--duration-fast) var(--ease-default);
+@mixin press-scale($scale: var(--motion-press-scale)) {
+  transition:
+    transform var(--motion-duration-press) var(--motion-ease-press),
+    opacity var(--motion-duration-press) var(--motion-ease-press);
 
   &:active {
     transform: scale($scale);
+    opacity: var(--motion-press-opacity);
   }
 }
 

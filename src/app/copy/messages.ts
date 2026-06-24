@@ -48,6 +48,10 @@ export const COPY_DIALOGS = {
   consolidateTitle: COPY_TERMS.consolidate,
   consolidateMessage:
     '確定整合這些欠款嗎？勾選的記錄會標成已整合。',
+  discardDraftTitle: '放棄這筆記帳？',
+  discardDraftMessage: '你尚未儲存，目前輸入的內容將會遺失。',
+  stayEditing: '繼續編輯',
+  discardLeave: '放棄離開',
   confirmSave: '確認儲存',
   confirmAdd: '確定',
   confirmCancel: '確定取消',

@@ -1,0 +1,21 @@
+<nav class="member-filter-bar" role="tablist" aria-label="篩選成員">
+  <app-member-filter-chip
+    label="全部"
+    [selected]="!selectedMemberId"
+    [routerLink]="['/transactions']"
+    [queryParams]="queryParamsFor()"
+    ariaLabel="全部記錄"
+  />
+  <app-member-filter-chip
+    *ngFor="let m of members"
+    [label]="m.name"
+    [member]="m"
+    [selected]="selectedMemberId === m.id"
+    [accentColor]="memberColorSolid(m.color)"
+    [routerLink]="['/transactions']"
+    [queryParams]="queryParamsFor(m.id)"
+    [ariaLabel]="
+      selectMode ? '與' + m.name + '可整合的分帳' : '與' + m.name + '的記錄'
+    "
+  />
+</nav>

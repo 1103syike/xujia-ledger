@@ -7,6 +7,12 @@
   flex-direction: column;
   gap: var(--layout-page-gap);
   padding-bottom: var(--space-8);
+
+  &--flow-submit {
+    padding-bottom: calc(
+      var(--layout-create-submit-offset) + env(safe-area-inset-bottom, 0px)
+    );
+  }
 }
 
 .page-title-bar {

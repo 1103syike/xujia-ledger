@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { combineLatest, map } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import {
@@ -10,34 +10,35 @@ import {
 } from '../../../core/ledger/ledger-calculator';
 import { isConsolidatable } from '../../../core/consolidation/debt-consolidation';
 import { memberNetRowsForTransaction } from '../../../core/transactions/transaction-member-nets';
+import { getAdvancePayers } from '../../../core/transactions/advance-allocation';
 import { activeTransactions, transactionTypeLabel } from '../../../core/transactions/transaction-date';
 import {
   formatTransactionListTime,
+  formatTransactionPickDate,
   groupByTransactionDate,
 } from '../../../core/transactions/transaction-date-groups';
 import {
-  formatTransactionPaymentDetail,
-  formatTransactionSplitDetail,
+  formatConsolidatePickParticipants,
   formatTransactionStoryLine,
 } from '../../../core/transactions/transaction-summary';
 import {
   formatViewerImpact,
   ViewerImpactDisplay,
 } from '../../../core/transactions/transaction-impact';
-import { MemberAvatarComponent } from '../../../shared/components/member/member-avatar.component';
+import { MemberFilterBarComponent } from '../../../shared/components/member/member-filter-bar.component';
 import { MemberNetChipsComponent } from '../../../shared/components/member/member-net-chips.component';
-import { TransactionDatePipe } from '../../../shared/pipes/transaction-date.pipe';
+import { ConsolidatePickRowComponent } from '../../../shared/components/ledger/consolidate-pick-row.component';
+import { SkeletonComponent } from '../../../shared/components/motion/skeleton.component';
 import { KaomojiDecoComponent } from '../../../shared/components/branding/kaomoji-deco.component';
-import { memberColorSolid } from '../../../core/display/member-color';
 import { Transaction } from '../../../core/models';
 import {
   COPY_ACTIONS,
   COPY_EMPTY,
   COPY_NAV,
   COPY_PAGES,
-  COPY_RECORD_TYPE,
   COPY_TERMS,
 } from '../../../copy';
+import { prefetchTransactionCreateRoute } from '../../../core/routing/lazy-routes';
 
 interface ListEntry {
   tx: Transaction;
@@ -45,10 +46,11 @@ interface ListEntry {
   impactDisplay: ViewerImpactDisplay;
   consolidatable: boolean;
   memberNets: ReturnType<typeof memberNetRowsForTransaction>;
+  payerIds: string[];
   storyLine: string;
-  paymentDetail: string;
-  splitDetail: string;
   listTime: string;
+  listDate: string;
+  participantLine: string;
 }
 
 @Component({
@@ -57,10 +59,11 @@ interface ListEntry {
   imports: [
     CommonModule,
     RouterLink,
-    TransactionDatePipe,
     KaomojiDecoComponent,
-    MemberAvatarComponent,
+    MemberFilterBarComponent,
     MemberNetChipsComponent,
+    ConsolidatePickRowComponent,
+    SkeletonComponent,
   ],
   templateUrl: './transaction-list.component.html',
 
@@ -69,21 +72,23 @@ export class TransactionListComponent implements OnInit {
   emptySalt = 0;
   selectMode = false;
   selectedIds: string[] = [];
-  expandedId: string | null = null;
+  private readonly selectMode$ = new BehaviorSubject(false);
   nav = COPY_NAV;
   actions = COPY_ACTIONS;
   pages = COPY_PAGES;
   terms = COPY_TERMS;
   empty = COPY_EMPTY;
   typeLabel = transactionTypeLabel;
-  memberColorSolid = memberColorSolid;
 
   vm$ = combineLatest([
     this.transactions.transactions$,
     this.auth.currentMember$,
     this.route.queryParamMap,
+    this.transactions.dataReady$,
+    this.selectMode$,
   ]).pipe(
-    map(([transactions, viewer, params]) => {
+    map(([transactions, viewer, params, dataReady, selectMode]) => {
+      const inSelectMode = selectMode || params.get('consolidate') === '1';
       const viewerId = viewer?.id ?? '';
       const withMemberId = params.get('with');
       const active = activeTransactions(transactions);
@@ -99,8 +104,21 @@ export class TransactionListComponent implements OnInit {
           ? transactionsBetweenMembers(active, viewerId, withMemberId)
           : active;
 
+      const consolidatableActive = active.filter((tx) => isConsolidatable(tx));
+      const filterMembers = inSelectMode
+        ? otherMembers.filter((m) =>
+            viewerId
+              ? transactionsBetweenMembers(
+                  consolidatableActive,
+                  viewerId,
+                  m.id
+                ).length > 0
+              : false
+          )
+        : otherMembers;
+
       const nameOf = (id: string) => this.auth.getMember(id)?.name ?? id;
-      const entries: ListEntry[] = filtered.map((tx) => {
+      let entries: ListEntry[] = filtered.map((tx) => {
         const impact = viewerId ? signedImpactOnMember(tx, viewerId) : 0;
         return {
           tx,
@@ -108,18 +126,31 @@ export class TransactionListComponent implements OnInit {
           impactDisplay: formatViewerImpact(tx, viewerId),
           consolidatable: isConsolidatable(tx),
           memberNets: memberNetRowsForTransaction(tx),
+          payerIds:
+            tx.type === 'advance'
+              ? getAdvancePayers(tx).map((p) => p.memberId)
+              : [],
           storyLine: formatTransactionStoryLine(tx, nameOf),
-          paymentDetail: formatTransactionPaymentDetail(tx, nameOf),
-          splitDetail: formatTransactionSplitDetail(tx, nameOf),
           listTime: formatTransactionListTime(tx),
+          listDate: formatTransactionPickDate(tx),
+          participantLine: formatConsolidatePickParticipants(
+            tx,
+            nameOf,
+            COPY_TERMS.payerBadge
+          ),
         };
       });
 
+      if (inSelectMode) {
+        entries = entries.filter((e) => e.consolidatable);
+      }
+
       return {
+        inSelectMode,
         withMemberId,
         withMember,
-        otherMembers,
-        consolidatableCount: filtered.filter((tx) => isConsolidatable(tx)).length,
+        otherMembers: filterMembers,
+        dataReady,
         sections: groupByTransactionDate(entries),
       };
     })
@@ -133,9 +164,10 @@ export class TransactionListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    prefetchTransactionCreateRoute();
     this.route.queryParamMap.subscribe((params) => {
       if (params.get('consolidate') === '1') {
-        this.enterSelectMode();
+        this.setSelectMode(true);
       }
       const preselected = params.get('ids');
       if (preselected) {
@@ -144,31 +176,30 @@ export class TransactionListComponent implements OnInit {
     });
   }
 
-  isExpanded(id: string): boolean {
-    return this.expandedId === id;
-  }
-
-  toggleExpanded(id: string): void {
-    this.expandedId = this.expandedId === id ? null : id;
-  }
-
   enterSelectMode(): void {
-    this.selectMode = true;
-    this.expandedId = null;
+    void this.router.navigate(['/transactions'], {
+      queryParams: { consolidate: '1' },
+      queryParamsHandling: 'merge',
+    });
   }
 
   cancelSelectMode(): void {
-    this.selectMode = false;
+    this.setSelectMode(false);
     this.selectedIds = [];
     void this.router.navigate(['/transactions'], { replaceUrl: true });
+  }
+
+  private setSelectMode(on: boolean): void {
+    this.selectMode = on;
+    this.selectMode$.next(on);
   }
 
   isSelected(id: string): boolean {
     return this.selectedIds.includes(id);
   }
 
-  onRowClick(entry: { tx: { id: string }; consolidatable: boolean }): void {
-    if (!this.selectMode || !entry.consolidatable) return;
+  onRowClick(entry: { tx: { id: string } }): void {
+    if (!this.selectMode) return;
     this.toggleSelect(entry.tx.id);
   }
 

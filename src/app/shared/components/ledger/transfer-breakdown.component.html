@@ -1,6 +1,6 @@
     <div *ngIf="edges.length > 0" class="card-stack">
       <p class="card-title">轉帳清單（最少筆數）</p>
-      <div class="stack-sm">
+      <div class="inset-panel-list">
         <div
           *ngFor="let e of edges"
           class="inset-panel flex items-center justify-between gap-3"
@@ -24,7 +24,8 @@
     <div *ngIf="payers.length > 0 || receivers.length > 0" class="card-stack">
       <p class="card-title">結算明細</p>
 
-      <div *ngIf="payers.length > 0" class="stack-sm">
+      <div class="stack-md">
+      <div *ngIf="payers.length > 0" class="inset-panel-list">
         <p class="caption-text font-medium text-debt">應付</p>
         <div *ngFor="let row of payers" class="inset-panel">
           <div class="mb-2 flex items-center justify-between gap-2">
@@ -50,7 +51,7 @@
         </div>
       </div>
 
-      <div *ngIf="receivers.length > 0" class="stack-sm">
+      <div *ngIf="receivers.length > 0" class="inset-panel-list">
         <p class="caption-text font-medium text-positive">應收</p>
         <div *ngFor="let row of receivers" class="inset-panel">
           <div class="mb-2 flex items-center justify-between gap-2">
@@ -74,6 +75,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   

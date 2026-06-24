@@ -82,6 +82,7 @@
   --layout-header-min-height: 2.75rem;
   --layout-touch-target: 2.75rem;
   --layout-bottom-nav-height: 4.25rem;
+  --layout-create-submit-offset: 5.75rem;
   --layout-max-width: 28rem;
   --layout-safe-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   --layout-safe-top: max(0.5rem, env(safe-area-inset-top, 0px));
@@ -130,7 +131,30 @@
   --duration-slow: 280ms;
   --ease-default: ease;
   --ease-out: ease-out;
+  --ease-in: ease-in;
   --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
+
+  /* Motion system aliases */
+  --motion-duration-instant: var(--duration-instant);
+  --motion-duration-fast: var(--duration-fast);
+  --motion-duration-normal: var(--duration-normal);
+  --motion-duration-page: 250ms;
+  --motion-duration-overlay: var(--duration-normal);
+  --motion-duration-dialog: 250ms;
+  --motion-duration-sheet: var(--duration-slow);
+  --motion-duration-toast: var(--duration-normal);
+  --motion-duration-list: var(--duration-normal);
+  --motion-duration-skeleton: 1.4s;
+  --motion-duration-press: var(--duration-fast);
+  --motion-ease-out: var(--ease-out);
+  --motion-ease-in: var(--ease-in);
+  --motion-ease-sheet: var(--ease-sheet);
+  --motion-ease-spring: var(--ease-spring);
+  --motion-ease-press: var(--ease-default);
+  --motion-press-scale: 0.96;
+  --motion-press-opacity: 0.92;
+  --motion-skeleton-threshold: 150ms;
 
   /* ── Z-index ── */
   --z-sticky-header: 10;

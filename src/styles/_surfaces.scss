@@ -17,6 +17,12 @@
   @include surface-inset;
 }
 
+.inset-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .rank-row {
   border-left: var(--space-1) solid var(--rank-accent, var(--ds-peach));
 }

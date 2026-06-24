@@ -6,6 +6,8 @@ export const COPY_TERMS = {
   repayment: '還款',
   consolidate: '整合欠款',
   payer: '付款人',
+  payerBadge: '👑 金主',
+  debtorBadge: '🥣 丐幫幫主',
   grossPaid: '實付',
   split: '分攤',
   noSplit: '不用分',

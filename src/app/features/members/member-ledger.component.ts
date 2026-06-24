@@ -15,6 +15,7 @@ import {
 } from '../../core/ledger/settlement-display';
 import { activeTransactions, transactionTypeLabel } from '../../core/transactions/transaction-date';
 import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
+import { SkeletonComponent } from '../../shared/components/motion/skeleton.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
 import { COPY_ACTIONS, COPY_NAV, COPY_PAGES } from '../../copy';
 
@@ -26,6 +27,7 @@ import { COPY_ACTIONS, COPY_NAV, COPY_PAGES } from '../../copy';
     RouterLink,
     MemberAvatarComponent,
     TransactionDatePipe,
+    SkeletonComponent,
   ],
   templateUrl: './member-ledger.component.html',
 
@@ -42,8 +44,9 @@ export class MemberLedgerComponent {
     this.route.paramMap,
     this.transactions.transactions$,
     this.auth.currentMember$,
+    this.transactions.dataReady$,
   ]).pipe(
-    map(([params, txs, viewer]) => {
+    map(([params, txs, viewer, dataReady]) => {
       const memberId = params.get('id') ?? '';
       const viewerId = viewer?.id ?? '';
       const active = activeTransactions(txs);
@@ -58,6 +61,7 @@ export class MemberLedgerComponent {
       return {
         memberId,
         viewerId,
+        dataReady,
         settlement,
         entries: related.map((tx) => ({
           tx,

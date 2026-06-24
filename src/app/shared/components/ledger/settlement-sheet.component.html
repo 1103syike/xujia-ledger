@@ -7,13 +7,15 @@
     >
       <button
         type="button"
-        class="absolute inset-0 bg-ink/25 backdrop-blur-[2px]"
+        class="absolute inset-0 bg-ink/25 backdrop-blur-[2px] motion-overlay"
+        [@sheetOverlay]
         aria-label="關閉"
         (click)="close()"
       ></button>
 
       <div
-        class="sheet-panel absolute bottom-0 left-0 right-0 mx-auto max-w-md rounded-t-3xl bg-white shadow-2xl"
+        class="sheet-panel motion-sheet-panel absolute bottom-0 left-0 right-0 mx-auto max-w-md rounded-t-3xl bg-white shadow-2xl"
+        [@sheetPanel]
         (click)="$event.stopPropagation()"
       >
         <div class="flex justify-center pt-3">
@@ -143,14 +145,14 @@
 
           <div *ngIf="mode === 'debt-breakdown' && contentView === 'interest'" class="stack-sm">
             <app-interest-estimate
-              *ngIf="settlementNetDebt > 0"
-              [principal]="settlementNetDebt"
+              *ngIf="settlementInterestPrincipal > 0"
+              [principal]="settlementInterestPrincipal"
             />
             <p
-              *ngIf="settlementNetDebt === 0"
+              *ngIf="settlementInterestPrincipal === 0"
               class="helper-text px-2 py-4 text-center"
             >
-              目前沒有待結算欠款，無需試算利息
+              {{ empty.noPendingDebtForInterest }}
             </p>
           </div>
 
@@ -178,14 +180,14 @@
 
             <div *ngIf="contentView === 'interest'">
               <app-interest-estimate
-                *ngIf="p.direction === 'owe'"
+                *ngIf="p.amount > 0"
                 [principal]="p.amount"
               />
               <p
-                *ngIf="p.direction === 'owed'"
+                *ngIf="p.amount === 0"
                 class="helper-text px-2 py-4 text-center"
               >
-                對方欠你款項，無需試算利息
+                {{ empty.noPendingDebtForInterest }}
               </p>
             </div>
           </ng-container>

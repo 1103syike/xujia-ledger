@@ -1,4 +1,7 @@
     <div class="page" *ngIf="vm$ | async as vm">
+      <app-skeleton *ngIf="!vm.dataReady" preset="detail" />
+
+      <ng-container *ngIf="vm.dataReady">
       <a [routerLink]="['/transactions']" [queryParams]="{ with: vm.memberId }" class="back-link">{{ actions.backToLedger }}</a>
 
       <div class="page-title-bar" *ngIf="auth.getMember(vm.memberId) as member">
@@ -71,5 +74,6 @@
           </a>
         </div>
       </section>
+      </ng-container>
     </div>
   

@@ -6,13 +6,14 @@ import {
   Output,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { dialogOverlay, dialogPanel } from '../../../animations/route.animations';
 
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './confirm-dialog.component.html',
-
+  animations: [dialogOverlay, dialogPanel],
 })
 export class ConfirmDialogComponent {
   @Input() open = false;
@@ -24,6 +25,10 @@ export class ConfirmDialogComponent {
   @Input() busyLabel = '處理中…';
   @Input() destructive = false;
   @Input() busy = false;
+  /** Primary = 繼續編輯、Danger = 放棄離開（離開保護用） */
+  @Input() stayPrimary = false;
+  @Input() stayLabel = '繼續編輯';
+  @Input() discardLabel = '放棄離開';
 
   @Output() confirmed = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();

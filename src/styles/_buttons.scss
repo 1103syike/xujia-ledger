@@ -39,6 +39,25 @@
   padding: var(--btn-sm-padding-y) var(--btn-sm-padding-x);
 }
 
+.btn-ghost {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--btn-sm-padding-y) var(--btn-sm-padding-x);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-link);
+  background: transparent;
+  transition: opacity var(--duration-fast) var(--ease-default);
+
+  &:active {
+    opacity: 0.72;
+  }
+
+  &:disabled {
+    @include disabled-state;
+  }
+}
+
 .btn-ghost-danger {
   width: 100%;
   border-radius: var(--radius-md);

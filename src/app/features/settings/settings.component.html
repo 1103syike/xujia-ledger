@@ -1,33 +1,165 @@
-    <div class="page" *ngIf="auth.currentMember as me">
-      <div class="flex items-center gap-3">
-        <app-member-avatar [member]="previewMember ?? me" size="lg" />
-        <div>
-          <h2 class="page-title">{{ displayNameOf(me) }}</h2>
-          <p class="helper-text">姓名：{{ me.name }}</p>
+    <div class="page settings-page" *ngIf="auth.currentMember as me">
+      <div class="page-title-bar settings-page__head">
+        <h2 class="page-title">個人資料</h2>
+      </div>
+
+      <div class="card-stack settings-collapsible">
+        <button
+          type="button"
+          class="settings-collapsible__head"
+          [attr.aria-expanded]="accountOpen"
+          (click)="toggleAccount()"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="card-title mb-0">暱稱與密碼</p>
+            <p *ngIf="accountOpen" class="helper-text mt-1 mb-0">
+              顯示暱稱與登入密碼可在此修改
+            </p>
+            <p *ngIf="!accountOpen" class="caption-text mt-1 mb-0">
+              {{ accountDisplayName }}
+            </p>
+          </div>
+          <span
+            class="settings-collapsible__chevron"
+            [class.settings-collapsible__chevron--open]="accountOpen"
+            aria-hidden="true"
+          >›</span>
+        </button>
+
+        <div *ngIf="accountOpen" class="settings-collapsible__body settings-account__fields">
+          <div class="field-group">
+            <label class="field-label">顯示暱稱</label>
+            <input
+              class="input"
+              [(ngModel)]="nickname"
+              placeholder="可與姓名不同"
+            />
+            <p class="helper-text">姓名：{{ me.name }}</p>
+          </div>
+
+          <div class="field-group settings-account__password">
+            <label class="field-label">登入密碼</label>
+            <p class="helper-text">可自訂密碼，長度不拘</p>
+            <input
+              type="password"
+              class="input"
+              [(ngModel)]="currentPassword"
+              placeholder="目前登入密碼"
+            />
+            <input
+              type="password"
+              class="input"
+              [(ngModel)]="newPassword"
+              placeholder="新登入密碼"
+            />
+          </div>
         </div>
       </div>
 
-      <div class="card-stack">
-        <p class="card-title">個人資料</p>
+      <div class="card-stack settings-collapsible">
+        <button
+          type="button"
+          class="settings-collapsible__head"
+          [attr.aria-expanded]="avatarOpen"
+          (click)="toggleAvatar()"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="card-title mb-0">頭像</p>
+            <p *ngIf="avatarOpen" class="helper-text mt-1 mb-0">
+              選擇頭像樣式或上傳照片
+            </p>
+          </div>
+          <app-member-avatar
+            *ngIf="!avatarOpen"
+            class="shrink-0"
+            [member]="previewMember ?? me"
+            size="sm"
+          />
+          <span
+            class="settings-collapsible__chevron"
+            [class.settings-collapsible__chevron--open]="avatarOpen"
+            aria-hidden="true"
+          >›</span>
+        </button>
 
-        <app-avatar-picker
-          [member]="me"
-          [choice]="avatarChoice"
-          (choiceChange)="onAvatarChoiceChange($event)"
-        />
-
-        <div>
-          <label class="field-label">顯示暱稱</label>
-          <input
-            class="input"
-            [(ngModel)]="nickname"
-            placeholder="可與姓名不同"
+        <div *ngIf="avatarOpen" class="settings-collapsible__body">
+          <app-avatar-picker
+            [member]="me"
+            [choice]="avatarChoice"
+            (choiceChange)="onAvatarChoiceChange($event)"
           />
         </div>
+      </div>
 
-        <div>
-          <label class="field-label">代表色</label>
-          <p class="helper-text mb-2">用於標籤與分攤顯示</p>
+      <div class="card-stack settings-collapsible">
+        <button
+          type="button"
+          class="settings-collapsible__head"
+          [attr.aria-expanded]="memberColorOpen"
+          (click)="toggleMemberColor()"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="card-title mb-0">代表色</p>
+            <p *ngIf="memberColorOpen" class="helper-text mt-1 mb-0">
+              用於標籤與分攤顯示
+            </p>
+          </div>
+          <span
+            *ngIf="!memberColorOpen && color"
+            class="settings-color-preview-thumb shrink-0"
+            [style.background-color]="memberColorSoftBg(color)"
+            [style.box-shadow]="
+              'inset 0 0 0 1px ' + memberColorBorder(color)
+            "
+            [attr.aria-label]="'已選：' + (selectedColorName || '代表色')"
+          ></span>
+          <span
+            class="settings-collapsible__chevron"
+            [class.settings-collapsible__chevron--open]="memberColorOpen"
+            aria-hidden="true"
+          >›</span>
+        </button>
+
+        <div *ngIf="memberColorOpen" class="settings-collapsible__body">
+          <div
+            *ngIf="color"
+            class="member-net-stack settings-color-chip-preview"
+            aria-label="代表色預覽"
+          >
+            <div
+              class="member-net-stack__row text-positive"
+              [style.background-color]="memberColorSoftBg(color)"
+              [style.box-shadow]="
+                'inset 0 0 0 1px ' + memberColorBorder(color)
+              "
+            >
+              <app-member-chibi-head chibiId="chibi-1" [size]="32" />
+              <div class="member-net-stack__info min-w-0">
+                <span class="member-net-stack__name">成員甲</span>
+                <span class="member-net-stack__badge member-net-stack__badge--payer">{{
+                  payerBadge
+                }}</span>
+              </div>
+              <span class="member-net-stack__amount">+$9999</span>
+            </div>
+
+            <div
+              class="member-net-stack__row text-debt"
+              [style.background-color]="memberColorSoftBg(color)"
+              [style.box-shadow]="
+                'inset 0 0 0 1px ' + memberColorBorder(color)
+              "
+            >
+              <app-member-chibi-head chibiId="chibi-2" [size]="32" />
+              <div class="member-net-stack__info min-w-0">
+                <span class="member-net-stack__name">成員乙</span>
+                <span class="member-net-stack__badge member-net-stack__badge--debtor">{{
+                  debtorBadge
+                }}</span>
+              </div>
+              <span class="member-net-stack__amount">-$9999</span>
+            </div>
+          </div>
 
           <div class="theme-swatch-grid">
             <button
@@ -50,76 +182,95 @@
             </button>
           </div>
 
-          <p class="caption-text mt-2 text-center" *ngIf="selectedColorName">
+          <p class="caption-text text-center mb-0" *ngIf="selectedColorName">
             已選：{{ selectedColorName }}
           </p>
         </div>
       </div>
 
-      <div class="card-stack">
-        <p class="card-title">背景色</p>
-        <p class="helper-text">選擇可即時預覽，按「儲存設定」才會永久套用</p>
+      <div class="card-stack settings-collapsible">
+        <button
+          type="button"
+          class="settings-collapsible__head"
+          [attr.aria-expanded]="themeOpen"
+          (click)="toggleTheme()"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="card-title mb-0">背景色</p>
+            <p *ngIf="themeOpen" class="helper-text mt-1 mb-0">
+              選擇可即時預覽，按「儲存設定」才會永久套用
+            </p>
+          </div>
+          <span
+            *ngIf="!themeOpen"
+            class="settings-color-preview-thumb shrink-0"
+            [style.background-color]="selectedThemeCream"
+            [style.box-shadow]="'inset 0 0 0 1px var(--color-border-input)'"
+            [attr.aria-label]="'已選：' + selectedThemeName"
+          ></span>
+          <span
+            class="settings-collapsible__chevron"
+            [class.settings-collapsible__chevron--open]="themeOpen"
+            aria-hidden="true"
+          >›</span>
+        </button>
 
-        <div class="theme-swatch-grid">
-          <button
-            *ngFor="let preset of themePresets"
-            type="button"
-            class="theme-swatch"
-            [class.theme-swatch--selected]="themePresetId === preset.id"
-            [style.background-color]="preset.colors.cream"
-            [attr.aria-label]="preset.name"
-            [attr.aria-pressed]="themePresetId === preset.id"
-            (click)="selectTheme(preset.id)"
-          >
-            <span
-              *ngIf="themePresetId === preset.id"
-              class="theme-swatch__check"
-              aria-hidden="true"
+        <div *ngIf="themeOpen" class="settings-collapsible__body">
+          <div class="theme-swatch-grid">
+            <button
+              *ngFor="let preset of themePresets"
+              type="button"
+              class="theme-swatch"
+              [class.theme-swatch--selected]="themePresetId === preset.id"
+              [style.background-color]="preset.colors.cream"
+              [attr.aria-label]="preset.name"
+              [attr.aria-pressed]="themePresetId === preset.id"
+              (click)="selectTheme(preset.id)"
             >
-              ✓
-            </span>
-          </button>
+              <span
+                *ngIf="themePresetId === preset.id"
+                class="theme-swatch__check"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+            </button>
+          </div>
+
+          <p class="caption-text text-center mb-0" *ngIf="selectedThemeName">
+            已選：{{ selectedThemeName }}
+          </p>
         </div>
+      </div>
 
-        <p class="caption-text text-center" *ngIf="selectedThemeName">
-          已選：{{ selectedThemeName }}
+      <div class="settings-page__actions">
+        <p
+          *ngIf="message"
+          class="body-text text-center mb-0"
+          [class.text-coral]="isError"
+          [class.text-positive]="!isError"
+        >
+          {{ message }}
         </p>
+
+        <button
+          type="button"
+          class="btn-primary w-full"
+          [disabled]="saving"
+          (click)="openSaveDialog()"
+        >
+          {{ saving ? '儲存中…' : '儲存設定' }}
+        </button>
+
+        <button
+          type="button"
+          class="settings-page__logout"
+          [disabled]="loggingOut"
+          (click)="openLogoutDialog()"
+        >
+          登出帳號
+        </button>
       </div>
-
-      <div class="card-stack">
-        <p class="card-title">登入密碼</p>
-        <p class="helper-text">可自訂密碼，長度不拘</p>
-        <input
-          type="password"
-          class="input"
-          [(ngModel)]="currentPassword"
-          placeholder="目前登入密碼"
-        />
-        <input
-          type="password"
-          class="input"
-          [(ngModel)]="newPassword"
-          placeholder="新登入密碼"
-        />
-      </div>
-
-      <p
-        *ngIf="message"
-        class="body-text text-center"
-        [class.text-coral]="isError"
-        [class.text-mint]="!isError"
-      >
-        {{ message }}
-      </p>
-
-      <button
-        type="button"
-        class="btn-primary w-full"
-        [disabled]="saving"
-        (click)="openSaveDialog()"
-      >
-        {{ saving ? '儲存中…' : '儲存設定' }}
-      </button>
 
       <app-confirm-dialog
         [open]="saveDialogOpen"
@@ -133,12 +284,17 @@
         (cancelled)="closeSaveDialog()"
       />
 
-      <button
-        type="button"
-        class="btn-secondary w-full text-coral"
-        (click)="logout()"
-      >
-        登出帳號
-      </button>
+      <app-confirm-dialog
+        [open]="logoutDialogOpen"
+        title="登出帳號"
+        [detail]="displayNameOf(me)"
+        message="確定要登出嗎？需重新輸入密碼才能再次登入。"
+        confirmLabel="確認登出"
+        cancelLabel="取消"
+        [destructive]="true"
+        [busy]="loggingOut"
+        (confirmed)="confirmLogout()"
+        (cancelled)="closeLogoutDialog()"
+      />
     </div>
   

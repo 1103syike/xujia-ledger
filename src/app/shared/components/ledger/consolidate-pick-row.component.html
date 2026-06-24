@@ -1,0 +1,23 @@
+<div class="consolidate-pick-row__head">
+  <p class="consolidate-pick-row__title">{{ title }}</p>
+  <time class="consolidate-pick-row__date">{{ listDate }}</time>
+</div>
+
+<div
+  class="consolidate-pick-row__impact"
+  [class.consolidate-pick-row__impact--receivable]="impactDisplay.kind === 'receivable'"
+  [class.consolidate-pick-row__impact--payable]="impactDisplay.kind === 'payable'"
+  [class.consolidate-pick-row__impact--neutral]="impactDisplay.kind === 'neutral'"
+  [class.consolidate-pick-row__impact--amount]="impactDisplay.kind === 'amount'"
+>
+  <span *ngIf="impactDisplay.label" class="consolidate-pick-row__impact-label">
+    {{ impactDisplay.label }}
+  </span>
+  <span *ngIf="impactDisplay.amountText" class="consolidate-pick-row__impact-amount">
+    {{ impactDisplay.amountText }}
+  </span>
+</div>
+
+<p *ngIf="participantLine" class="consolidate-pick-row__participants">
+  {{ participantLine }}
+</p>

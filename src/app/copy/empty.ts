@@ -8,6 +8,8 @@ export const COPY_EMPTY = {
   ledgerClear: '帳本已結清，暫時不用記還款',
   noConsolidatable:
     '目前沒有可整合的分帳（已整合或已還款的記錄無法勾選）',
+  noConsolidatableWithMember: (name: string) =>
+    `與${name}沒有可整合的分帳`,
   noConsolidationDebt: '勾選的記錄之間沒有待結清的欠款',
   noRelatedRecords: '還沒有相關記錄',
   noRelatedWithOther: '跟對方還沒有相關記錄',

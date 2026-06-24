@@ -11,6 +11,9 @@ import {
   memberColorSoftBg,
 } from '../../../core/display/member-color';
 import { MemberAvatarComponent } from './member-avatar.component';
+import { COPY_TERMS } from '../../../copy';
+
+export type MemberNetChipsLayout = 'grid' | 'stack';
 
 @Component({
   selector: 'app-member-net-chips',
@@ -25,6 +28,12 @@ export class MemberNetChipsComponent {
   @Input() compact = false;
   /** 每列欄數（預設 5，對應家族成員數） */
   @Input() columns = 5;
+  @Input() layout: MemberNetChipsLayout = 'grid';
+  /** 實際付款人 memberId（顯示金主 Badge，不影響金額） */
+  @Input() payerIds: string[] = [];
+
+  readonly payerBadge = COPY_TERMS.payerBadge;
+  readonly debtorBadge = COPY_TERMS.debtorBadge;
 
   formatOwe = formatOweAmount;
   formatOwed = formatOwedAmount;
@@ -43,5 +52,19 @@ export class MemberNetChipsComponent {
 
   rowAmount(row: MemberNetRow): number {
     return row.displayNet ?? row.net;
+  }
+
+  isPayer(memberId: string): boolean {
+    return this.payerIds.includes(memberId);
+  }
+
+  rowStackBadgeKind(row: MemberNetRow): 'payer' | 'debtor' | null {
+    if (this.isPayer(row.memberId)) {
+      return 'payer';
+    }
+    if (this.rowAmount(row) < 0) {
+      return 'debtor';
+    }
+    return null;
   }
 }

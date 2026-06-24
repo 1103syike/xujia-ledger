@@ -18,6 +18,22 @@
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-1);
   text-align: center;
+
+  &.text-positive {
+    color: color-mix(in srgb, var(--color-positive) 62%, var(--color-text));
+
+    .member-net-chip__amount {
+      color: color-mix(in srgb, var(--color-positive) 74%, var(--color-text));
+    }
+  }
+
+  &.text-debt {
+    color: color-mix(in srgb, var(--color-debt) 58%, var(--color-text));
+
+    .member-net-chip__amount {
+      color: color-mix(in srgb, var(--color-debt) 72%, var(--color-text));
+    }
+  }
 }
 
 .member-net-chip__name {
@@ -33,6 +49,82 @@
   line-height: var(--line-height-tight);
   font-variant-numeric: tabular-nums;
   color: inherit;
+}
+
+.member-net-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.member-net-stack__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+
+  &.text-positive {
+    .member-net-stack__name {
+      color: color-mix(in srgb, var(--color-positive) 62%, var(--color-text));
+    }
+
+    .member-net-stack__amount {
+      color: color-mix(in srgb, var(--color-positive) 74%, var(--color-text));
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  &.text-debt {
+    .member-net-stack__name {
+      color: color-mix(in srgb, var(--color-debt) 58%, var(--color-text));
+    }
+
+    .member-net-stack__amount {
+      color: color-mix(in srgb, var(--color-debt) 72%, var(--color-text));
+      font-weight: var(--font-weight-bold);
+    }
+  }
+}
+
+.member-net-stack__info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.member-net-stack__name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  @include truncate;
+}
+
+.member-net-stack__badge {
+  min-height: 1.125rem;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.125rem;
+
+  &--payer {
+    color: color-mix(in srgb, var(--ds-mint) 55%, var(--color-text));
+  }
+
+  &--debtor {
+    color: color-mix(in srgb, var(--ds-coral) 55%, var(--color-text));
+  }
+
+  &--placeholder {
+    visibility: hidden;
+  }
+}
+
+.member-net-stack__amount {
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  @include tabular-amount;
 }
 
 .member-select-grid {

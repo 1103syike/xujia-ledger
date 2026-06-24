@@ -1,186 +1,170 @@
-    <div class="page" *ngIf="vm$ | async as vm">
-      <div class="page-title-bar">
-        <h2 class="page-title">
-          {{ selectMode ? pages.selectToConsolidate : vm.withMember ? nav.ledgerWith(vm.withMember.name) : nav.ledger }}
-        </h2>
-        <div class="page-title-bar__aside flex gap-2">
-          <button
-            *ngIf="!selectMode && !vm.withMemberId"
-            type="button"
-            class="btn-secondary btn-sm"
-            (click)="enterSelectMode()"
-          >
-            {{ terms.consolidate }}
-          </button>
-          <a *ngIf="!selectMode" routerLink="/transactions/new" class="btn-primary btn-sm">{{ actions.addRecord }}</a>
+    <div class="page" [class.page--flow-submit]="selectMode" *ngIf="vm$ | async as vm">
+      <header class="ledger-page-header">
+        <div class="page-title-bar">
+          <h2 class="page-title">
+            {{ selectMode ? pages.selectToConsolidate : nav.ledger }}
+          </h2>
+          <div class="page-title-bar__aside">
+            <button
+              *ngIf="!selectMode && !vm.withMemberId"
+              type="button"
+              class="btn-ghost btn-sm"
+              (click)="enterSelectMode()"
+            >
+              {{ terms.consolidate }}
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="member-filter-bar" *ngIf="!selectMode">
-        <a
-          routerLink="/transactions"
-          class="member-filter-chip"
-          [class.member-filter-chip--active]="!vm.withMemberId"
-          aria-label="全部記錄"
-        >
-          <span class="member-filter-chip__all">全</span>
-          <span class="member-filter-chip__label">全部</span>
-        </a>
-        <a
-          *ngFor="let m of vm.otherMembers"
-          [routerLink]="['/transactions']"
-          [queryParams]="{ with: m.id }"
-          class="member-filter-chip"
-          [class.member-filter-chip--active]="vm.withMemberId === m.id"
-          [attr.aria-label]="'與' + m.name + '的記錄'"
-          [style.--filter-accent]="memberColorSolid(m.color)"
-        >
-          <app-member-avatar [member]="m" size="sm" />
-          <span class="member-filter-chip__label">{{ m.name }}</span>
-        </a>
-      </div>
+        <app-member-filter-bar
+          *ngIf="vm.dataReady"
+          [members]="vm.otherMembers"
+          [selectedMemberId]="vm.withMemberId"
+          [selectMode]="vm.inSelectMode"
+          [selectedIds]="selectedIds"
+        />
+      </header>
 
-      <div *ngIf="vm.sections.length === 0" class="empty-state">
+      <app-skeleton *ngIf="!vm.dataReady" preset="tx-list" [count]="4" />
+
+      <div *ngIf="vm.dataReady && vm.sections.length === 0" class="empty-state">
         <app-kaomoji-deco mood="expense" seed="transaction-list" [salt]="emptySalt" />
         <p class="empty-state__text">
-          {{ vm.withMember ? empty.noRecordsWithMember(vm.withMember.name) : empty.noRecords }}
+          <ng-container *ngIf="selectMode">
+            {{
+              vm.withMember
+                ? empty.noConsolidatableWithMember(vm.withMember.name)
+                : empty.noConsolidatable
+            }}
+          </ng-container>
+          <ng-container *ngIf="!selectMode">
+            {{ vm.withMember ? empty.noRecordsWithMember(vm.withMember.name) : empty.noRecords }}
+          </ng-container>
         </p>
         <a *ngIf="!vm.withMember && !selectMode" routerLink="/transactions/new" class="btn-primary mt-4 inline-block">
           {{ empty.noRecordsCta }}
         </a>
       </div>
 
-      <div class="list-stack" [class.pb-36]="selectMode">
+      <div *ngIf="vm.dataReady && vm.sections.length > 0" class="list-stack" [class.pb-36]="selectMode">
         <section *ngFor="let section of vm.sections" class="mb-4">
           <p class="tx-date-section__label">{{ section.label }}</p>
 
           <div class="stack-sm">
-            <div
-              *ngFor="let entry of section.items"
-              class="tx-card"
-              [class.tx-card--expanded]="!selectMode && isExpanded(entry.tx.id)"
-              [class.cursor-pointer]="selectMode && entry.consolidatable"
-              [class.opacity-50]="selectMode && !entry.consolidatable"
-              [class.ring-2]="selectMode && isSelected(entry.tx.id)"
-              [class.ring-coral]="selectMode && isSelected(entry.tx.id)"
-            >
+            <ng-container *ngIf="selectMode; else ledgerCards">
               <div
-                *ngIf="selectMode"
-                class="flex items-start gap-3"
+                *ngFor="let entry of section.items; let i = index"
+                class="consolidate-pick-card motion-list-enter cursor-pointer"
+                [style.animation-delay.ms]="i * 40"
+                [class.ring-2]="isSelected(entry.tx.id)"
+                [class.ring-coral]="isSelected(entry.tx.id)"
                 role="button"
                 [attr.aria-pressed]="isSelected(entry.tx.id)"
-                [attr.aria-disabled]="!entry.consolidatable"
                 (click)="onRowClick(entry)"
               >
-                <div class="mt-0.5 flex shrink-0 items-center" aria-hidden="true">
-                  <input
-                    type="checkbox"
-                    class="pointer-events-none h-5 w-5 accent-coral"
-                    [checked]="isSelected(entry.tx.id)"
-                    [disabled]="!entry.consolidatable"
-                    tabindex="-1"
-                  />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <ng-container *ngTemplateOutlet="summaryContent; context: { $implicit: entry }" />
+                <div class="consolidate-pick-card__row">
+                  <div class="consolidate-pick-card__check" aria-hidden="true">
+                    <input
+                      type="checkbox"
+                      class="pointer-events-none h-5 w-5 accent-coral"
+                      [checked]="isSelected(entry.tx.id)"
+                      tabindex="-1"
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <app-consolidate-pick-row
+                      [title]="entry.tx.title"
+                      [impactDisplay]="entry.impactDisplay"
+                      [listDate]="entry.listDate"
+                      [participantLine]="entry.participantLine"
+                    />
+                  </div>
                 </div>
               </div>
+            </ng-container>
 
-              <ng-container *ngIf="!selectMode">
-                <button
-                  type="button"
-                  class="tx-card__summary"
-                  [attr.aria-expanded]="isExpanded(entry.tx.id)"
-                  (click)="toggleExpanded(entry.tx.id)"
+            <ng-template #ledgerCards>
+              <div
+                *ngFor="let entry of section.items; let i = index"
+                class="tx-card motion-list-enter"
+                [style.animation-delay.ms]="i * 40"
+              >
+                <a
+                  class="tx-card__link motion-press-card"
+                  [routerLink]="['/transactions', entry.tx.id]"
                 >
                   <ng-container *ngTemplateOutlet="summaryContent; context: { $implicit: entry }" />
-                </button>
-
-                <div *ngIf="isExpanded(entry.tx.id)" class="tx-card__expand">
-                  <div class="tx-card__detail-row">
-                    <span>日期</span>
-                    <span>{{ entry.tx | transactionDate }}</span>
-                  </div>
-                  <div *ngIf="entry.tx.type === 'advance'" class="tx-card__detail-row">
-                    <span>{{ pages.payment }}</span>
-                    <span class="text-right">{{ entry.paymentDetail }}</span>
-                  </div>
-                  <div *ngIf="entry.tx.type === 'advance'" class="tx-card__detail-row">
-                    <span>{{ pages.split }}</span>
-                    <span class="text-right">{{ entry.splitDetail }}</span>
-                  </div>
-                  <div *ngIf="entry.tx.type === 'repayment'" class="tx-card__detail-row">
-                    <span>{{ pages.repayment }}</span>
-                    <span class="text-right">{{ entry.paymentDetail }}</span>
-                  </div>
-                  <div *ngIf="entry.tx.note" class="tx-card__detail-row">
-                    <span>備註</span>
-                    <span class="text-right">{{ entry.tx.note }}</span>
-                  </div>
-
-                  <div *ngIf="entry.tx.type === 'advance'" class="mt-2">
-                    <p class="caption-text mb-1">{{ pages.eachPersonAmount }}</p>
-                    <app-member-net-chips [rows]="entry.memberNets" [showName]="true" />
-                  </div>
-
-                  <a [routerLink]="['/transactions', entry.tx.id]" class="tx-card__detail-link">
-                    {{ pages.viewFullDetail }}
-                  </a>
-                </div>
-              </ng-container>
-            </div>
+                </a>
+              </div>
+            </ng-template>
           </div>
         </section>
       </div>
 
-      <p *ngIf="selectMode && vm.consolidatableCount === 0" class="helper-text -mt-2 text-center">
-        {{ empty.noConsolidatable }}
-      </p>
-
-      <div
-        *ngIf="selectMode"
-        class="consolidate-action-bar fixed left-0 right-0 z-20 border-t border-peach/20 bg-white/95 px-4 py-3 backdrop-blur-md"
-      >
-        <div class="mx-auto flex max-w-md items-center gap-3">
-          <button type="button" class="btn-secondary btn-sm" (click)="cancelSelectMode()">取消</button>
+      <div *ngIf="selectMode" class="create-submit-bar">
+        <div class="create-submit-bar__inner create-submit-bar__inner--row">
+          <button type="button" class="btn-secondary btn-sm" (click)="cancelSelectMode()">
+            {{ actions.cancel }}
+          </button>
           <button
             type="button"
             class="btn-primary btn-sm flex-1"
             [disabled]="selectedIds.length === 0"
             (click)="goToConsolidation()"
           >
-            下一步（{{ selectedIds.length }} 筆）
+            {{ actions.next }}（{{ selectedIds.length }} 筆）
           </button>
         </div>
       </div>
     </div>
 
     <ng-template #summaryContent let-entry>
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="item-title truncate">{{ entry.tx.title }}</p>
-          <p class="tx-card__subtitle truncate">{{ entry.storyLine }}</p>
-          <p class="tx-card__meta">
-            NT$ {{ entry.tx.totalAmount }}
-            <span> · {{ entry.listTime }}</span>
-            <span *ngIf="entry.tx.settledByTransferId"> · {{ terms.consolidated }}</span>
-            <span *ngIf="selectMode"> · {{ typeLabel(entry.tx.type) }}</span>
-          </p>
+      <div class="tx-card__head">
+        <div class="tx-card__head-main min-w-0">
+          <p class="item-title">{{ entry.tx.title }}</p>
+          <p *ngIf="entry.storyLine" class="tx-card__subtitle">{{ entry.storyLine }}</p>
         </div>
-        <div
-          class="tx-card__impact"
-          [class.tx-card__impact--receivable]="entry.impactDisplay.kind === 'receivable'"
-          [class.tx-card__impact--payable]="entry.impactDisplay.kind === 'payable'"
-          [class.tx-card__impact--neutral]="entry.impactDisplay.kind === 'neutral'"
-          [class.tx-card__impact--amount]="entry.impactDisplay.kind === 'amount'"
-        >
-          <span *ngIf="entry.impactDisplay.label" class="tx-card__impact-label">
-            {{ entry.impactDisplay.label }}
-          </span>
-          <span *ngIf="entry.impactDisplay.amountText" class="tx-card__impact-amount">
-            {{ entry.impactDisplay.amountText }}
-          </span>
-        </div>
+        <time class="tx-card__datetime">{{ entry.listTime }}</time>
       </div>
+
+      <div
+        *ngIf="
+          entry.impactDisplay.label ||
+          entry.impactDisplay.amountText ||
+          (!entry.impactDisplay.amountText && entry.tx.type === 'transfer')
+        "
+        class="tx-card__impact"
+        [class.tx-card__impact--receivable]="entry.impactDisplay.kind === 'receivable'"
+        [class.tx-card__impact--payable]="entry.impactDisplay.kind === 'payable'"
+        [class.tx-card__impact--neutral]="entry.impactDisplay.kind === 'neutral'"
+        [class.tx-card__impact--amount]="entry.impactDisplay.kind === 'amount'"
+      >
+        <span *ngIf="entry.impactDisplay.label" class="tx-card__impact-label">
+          {{ entry.impactDisplay.label }}
+        </span>
+        <span *ngIf="entry.impactDisplay.amountText" class="tx-card__impact-amount">
+          {{ entry.impactDisplay.amountText }}
+        </span>
+        <span
+          *ngIf="!entry.impactDisplay.amountText && entry.tx.type === 'transfer'"
+          class="tx-card__impact-amount text-ink"
+        >
+          NT$ {{ entry.tx.totalAmount }}
+        </span>
+      </div>
+
+      <div *ngIf="entry.memberNets.length > 0" class="tx-card__divider" aria-hidden="true"></div>
+
+      <app-member-net-chips
+        *ngIf="entry.memberNets.length > 0"
+        class="tx-card__members"
+        [rows]="entry.memberNets"
+        [showName]="true"
+        layout="stack"
+        [payerIds]="entry.payerIds"
+      />
+
+      <p *ngIf="entry.tx.settledByTransferId" class="tx-card__meta">
+        <span>{{ terms.consolidated }}</span>
+      </p>
     </ng-template>
-  

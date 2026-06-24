@@ -1,0 +1,17 @@
+<a
+  class="filter-chip"
+  [class.filter-chip--selected]="selected"
+  [class.filter-chip--accent]="!!accentColor"
+  [routerLink]="routerLink"
+  [queryParams]="queryParams"
+  role="tab"
+  [attr.aria-selected]="selected"
+  [attr.aria-label]="ariaLabel || label"
+  [style.--filter-chip-accent]="accentColor || null"
+>
+  <span class="filter-chip__lead" aria-hidden="true">
+    <app-member-avatar *ngIf="member" [member]="member" size="xs" />
+    <span *ngIf="!member" class="filter-chip__glyph">全</span>
+  </span>
+  <span class="filter-chip__label">{{ label }}</span>
+</a>

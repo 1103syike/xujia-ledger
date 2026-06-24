@@ -18,13 +18,26 @@ import {
   resolveAvatarChoice,
 } from '../../core/models';
 import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
+import { MemberChibiHeadComponent } from '../../shared/components/member/member-chibi-head.component';
 import { AvatarPickerComponent } from '../../shared/components/branding/avatar-picker.component';
 import { ConfirmDialogComponent } from '../../shared/components/form/confirm-dialog.component';
+import {
+  memberColorBorder,
+  memberColorSoftBg,
+} from '../../core/display/member-color';
+import { COPY_TERMS } from '../../copy';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, MemberAvatarComponent, AvatarPickerComponent, ConfirmDialogComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MemberAvatarComponent,
+    MemberChibiHeadComponent,
+    AvatarPickerComponent,
+    ConfirmDialogComponent,
+  ],
   templateUrl: './settings.component.html',
 
 })
@@ -32,6 +45,10 @@ export class SettingsComponent implements OnDestroy {
   themePresets = THEME_PRESETS;
   memberColorOptions = MEMBER_COLOR_OPTIONS;
   displayNameOf = displayNameOf;
+  memberColorSoftBg = memberColorSoftBg;
+  memberColorBorder = memberColorBorder;
+  readonly payerBadge = COPY_TERMS.payerBadge;
+  readonly debtorBadge = COPY_TERMS.debtorBadge;
 
   nickname = '';
   emoji = '';
@@ -42,9 +59,15 @@ export class SettingsComponent implements OnDestroy {
   message = '';
   isError = false;
   saving = false;
+  loggingOut = false;
   saveDialogOpen = false;
+  logoutDialogOpen = false;
   avatarChoice: AvatarChoice = { type: 'svg', svgId: 'chibi-1' };
   previewMember: DisplayMember | null = null;
+  accountOpen = false;
+  avatarOpen = false;
+  memberColorOpen = false;
+  themeOpen = false;
   private loadedMemberId: string | null = null;
 
   constructor(
@@ -63,8 +86,18 @@ export class SettingsComponent implements OnDestroy {
     return getThemePreset(this.themePresetId).name;
   }
 
+  get selectedThemeCream(): string {
+    return getThemePreset(this.themePresetId).colors.cream;
+  }
+
   get selectedColorName(): string | null {
     return memberColorLabel(this.color);
+  }
+
+  get accountDisplayName(): string {
+    const me = this.auth.currentMember;
+    if (!me) return '';
+    return this.nickname.trim() || me.name;
   }
 
   isColorSelected(value: string): boolean {
@@ -78,6 +111,22 @@ export class SettingsComponent implements OnDestroy {
   selectTheme(id: ThemePresetId): void {
     this.themePresetId = id;
     this.themeService.applyTheme(getThemePreset(id).colors);
+  }
+
+  toggleMemberColor(): void {
+    this.memberColorOpen = !this.memberColorOpen;
+  }
+
+  toggleAccount(): void {
+    this.accountOpen = !this.accountOpen;
+  }
+
+  toggleAvatar(): void {
+    this.avatarOpen = !this.avatarOpen;
+  }
+
+  toggleTheme(): void {
+    this.themeOpen = !this.themeOpen;
   }
 
   onAvatarChoiceChange(choice: AvatarChoice): void {
@@ -210,9 +259,22 @@ export class SettingsComponent implements OnDestroy {
     }
   }
 
-  async logout(): Promise<void> {
+  async confirmLogout(): Promise<void> {
+    this.loggingOut = true;
     await this.auth.logout();
+    this.loggingOut = false;
+    this.logoutDialogOpen = false;
     this.router.navigateByUrl('/login');
+  }
+
+  openLogoutDialog(): void {
+    if (this.loggingOut) return;
+    this.logoutDialogOpen = true;
+  }
+
+  closeLogoutDialog(): void {
+    if (this.loggingOut) return;
+    this.logoutDialogOpen = false;
   }
 
   private sanitizeAvatarChoice(me: NonNullable<typeof this.auth.currentMember>) {

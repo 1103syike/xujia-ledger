@@ -15,13 +15,12 @@
   transition: box-shadow var(--duration-fast) var(--ease-default);
 }
 
-.tx-card--expanded {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ds-coral) 25%, transparent);
-}
-
-.tx-card__summary {
+.tx-card__link {
+  display: block;
   width: 100%;
   text-align: left;
+  text-decoration: none;
+  color: inherit;
 }
 
 .tx-card__amount {
@@ -36,41 +35,48 @@
   color: var(--color-text-secondary);
 }
 
+.tx-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tx-card__head-main {
+  flex: 1;
+}
+
 .tx-card__meta {
   margin-top: var(--space-1);
   font-size: 0.6875rem; /* 11px — meta only */
   color: color-mix(in srgb, var(--color-text) 42%, transparent);
 }
 
-.tx-card__expand {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-divider);
-  @extend .stack-sm;
-}
-
-.tx-card__detail-row {
+.tx-card__impact-row {
   display: flex;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-3);
-  @extend .caption-text;
+  margin-top: var(--space-2);
 }
 
-.tx-card__detail-link {
-  margin-top: var(--space-2);
-  display: block;
-  text-align: center;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-link);
+.tx-card__datetime {
+  flex-shrink: 0;
+  padding-top: 0.125rem;
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
 }
 
 .tx-card__impact {
   display: flex;
   flex-shrink: 0;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .tx-card__impact-label {
@@ -113,4 +119,117 @@
 
 .tx-card__impact--amount .tx-card__impact-label {
   color: var(--color-text-muted);
+}
+
+.tx-card__divider {
+  margin-block: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+.tx-card__members {
+  display: block;
+}
+
+/* ── Consolidate pick row (select mode) ── */
+
+.consolidate-pick-card {
+  @extend .card;
+  padding: var(--space-3);
+  transition: box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.consolidate-pick-card__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+
+.consolidate-pick-card__check {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding-top: 0.125rem;
+}
+
+.consolidate-pick-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.consolidate-pick-row__title {
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.consolidate-pick-row__date {
+  flex-shrink: 0;
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
+.consolidate-pick-row__impact {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.consolidate-pick-row__impact-label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.consolidate-pick-row__impact-amount {
+  font-size: var(--font-size-sm);
+  @include tabular-amount;
+}
+
+.consolidate-pick-row__impact--receivable .consolidate-pick-row__impact-label {
+  color: color-mix(in srgb, var(--ds-mint) 70%, var(--color-text));
+}
+
+.consolidate-pick-row__impact--receivable .consolidate-pick-row__impact-amount {
+  color: var(--color-positive);
+}
+
+.consolidate-pick-row__impact--payable .consolidate-pick-row__impact-label {
+  color: color-mix(in srgb, var(--ds-coral) 70%, var(--color-text));
+}
+
+.consolidate-pick-row__impact--payable .consolidate-pick-row__impact-amount {
+  color: var(--color-debt);
+}
+
+.consolidate-pick-row__impact--neutral .consolidate-pick-row__impact-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-disabled);
+}
+
+.consolidate-pick-row__impact--neutral .consolidate-pick-row__impact-amount {
+  color: var(--color-text-disabled);
+}
+
+.consolidate-pick-row__impact--amount .consolidate-pick-row__impact-label {
+  color: var(--color-text-muted);
+}
+
+.consolidate-pick-row__participants {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-snug);
+  color: var(--color-text-secondary);
 }

@@ -55,11 +55,14 @@ function memberName(auth: AuthService, id: string): string {
 export class TransactionService implements OnDestroy {
   private readonly transactionsSubject = new BehaviorSubject<Transaction[]>([]);
   private readonly auditSubject = new BehaviorSubject<AuditLog[]>([]);
+  private readonly dataReadySubject = new BehaviorSubject(false);
   private unsubscribers: Array<() => void> = [];
   private legacyTransactionIds = new Set<string>();
 
   readonly transactions$ = this.transactionsSubject.asObservable();
   readonly auditLogs$ = this.auditSubject.asObservable();
+  /** Firestore 首次同步完成 */
+  readonly dataReady$ = this.dataReadySubject.asObservable();
 
   /** @deprecated 使用 transactions$ */
   readonly expenses$ = this.transactions$;
@@ -71,6 +74,7 @@ export class TransactionService implements OnDestroy {
       else {
         this.transactionsSubject.next([]);
         this.auditSubject.next([]);
+        this.dataReadySubject.next(false);
       }
     });
   }
@@ -561,6 +565,9 @@ export class TransactionService implements OnDestroy {
     const emit = () => {
       this.legacyTransactionIds = new Set(legacyRows.map((t) => t.id));
       this.transactionsSubject.next(mergeCollections(legacyRows, modernRows));
+      if (!this.dataReadySubject.value) {
+        this.dataReadySubject.next(true);
+      }
     };
 
     const legacyQuery = query(
@@ -610,6 +617,7 @@ export class TransactionService implements OnDestroy {
   private detachListeners(): void {
     this.unsubscribers.forEach((unsub) => unsub());
     this.unsubscribers = [];
+    this.dataReadySubject.next(false);
   }
 }
 
