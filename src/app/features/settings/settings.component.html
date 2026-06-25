@@ -243,6 +243,20 @@
         </div>
       </div>
 
+      <div class="card-stack">
+        <button
+          type="button"
+          class="settings-about"
+          (click)="openVersionHistory()"
+        >
+          <div class="min-w-0 flex-1 text-left">
+            <p class="card-title mb-0">版本歷程</p>
+            <p class="caption-text mt-1 mb-0">查看更新紀錄</p>
+          </div>
+          <span class="settings-about__version">v{{ appVersion }}</span>
+        </button>
+      </div>
+
       <div class="settings-page__actions">
         <p
           *ngIf="message"
@@ -295,6 +309,11 @@
         [busy]="loggingOut"
         (confirmed)="confirmLogout()"
         (cancelled)="closeLogoutDialog()"
+      />
+
+      <app-version-history-sheet
+        [open]="versionHistoryOpen"
+        (closed)="closeVersionHistory()"
       />
     </div>
   

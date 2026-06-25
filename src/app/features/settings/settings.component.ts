@@ -21,6 +21,10 @@ import { MemberAvatarComponent } from '../../shared/components/member/member-ava
 import { MemberChibiHeadComponent } from '../../shared/components/member/member-chibi-head.component';
 import { AvatarPickerComponent } from '../../shared/components/branding/avatar-picker.component';
 import { ConfirmDialogComponent } from '../../shared/components/form/confirm-dialog.component';
+import { VersionHistorySheetComponent } from '../../shared/components/release/version-history-sheet.component';
+import {
+  CURRENT_APP_VERSION,
+} from '../../core/release/release-history';
 import {
   memberColorBorder,
   memberColorSoftBg,
@@ -37,6 +41,7 @@ import { COPY_TERMS } from '../../copy';
     MemberChibiHeadComponent,
     AvatarPickerComponent,
     ConfirmDialogComponent,
+    VersionHistorySheetComponent,
   ],
   templateUrl: './settings.component.html',
 
@@ -49,6 +54,7 @@ export class SettingsComponent implements OnDestroy {
   memberColorBorder = memberColorBorder;
   readonly payerBadge = COPY_TERMS.payerBadge;
   readonly debtorBadge = COPY_TERMS.debtorBadge;
+  readonly appVersion = CURRENT_APP_VERSION;
 
   nickname = '';
   emoji = '';
@@ -62,6 +68,7 @@ export class SettingsComponent implements OnDestroy {
   loggingOut = false;
   saveDialogOpen = false;
   logoutDialogOpen = false;
+  versionHistoryOpen = false;
   avatarChoice: AvatarChoice = { type: 'svg', svgId: 'chibi-1' };
   previewMember: DisplayMember | null = null;
   accountOpen = false;
@@ -275,6 +282,14 @@ export class SettingsComponent implements OnDestroy {
   closeLogoutDialog(): void {
     if (this.loggingOut) return;
     this.logoutDialogOpen = false;
+  }
+
+  openVersionHistory(): void {
+    this.versionHistoryOpen = true;
+  }
+
+  closeVersionHistory(): void {
+    this.versionHistoryOpen = false;
   }
 
   private sanitizeAvatarChoice(me: NonNullable<typeof this.auth.currentMember>) {
