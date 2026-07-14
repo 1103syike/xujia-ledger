@@ -29,7 +29,7 @@
           <p class="helper-text mt-1 mb-0">
             目前版本
             <span class="version-history-sheet__current">v{{ currentVersion }}</span>
-            <span class="version-history-sheet__legend">· 珊瑚色為大版本</span>
+            <span class="version-history-sheet__legend">· 實心為目前版本 · 點可摺疊</span>
           </p>
         </div>
         <button
@@ -45,38 +45,86 @@
     <div class="version-history-sheet__scroll px-5 pb-5">
       <ol class="version-history-sheet__list">
         <li
-          *ngFor="let release of releases; let i = index; trackBy: trackRelease"
-          class="version-history-sheet__item"
-          [class.version-history-sheet__item--major]="isMajorRelease(i)"
+          *ngFor="let group of groups; trackBy: trackGroup"
+          class="version-history-sheet__group"
+          [class.version-history-sheet__group--open]="isLineExpanded(group.line)"
         >
-          <div class="version-history-sheet__marker" aria-hidden="true">
-            <span class="version-history-sheet__dot"></span>
-            <span *ngIf="i < releases.length - 1" class="version-history-sheet__line"></span>
+          <div class="version-history-sheet__item version-history-sheet__item--major">
+            <div class="version-history-sheet__marker" aria-hidden="true">
+              <span
+                class="version-history-sheet__dot"
+                [class.version-history-sheet__dot--solid]="isCurrentLine(group.line)"
+                [class.version-history-sheet__dot--hollow]="!isCurrentLine(group.line)"
+              ></span>
+            </div>
+
+            <button
+              type="button"
+              class="version-history-sheet__major min-w-0 flex-1"
+              [attr.aria-expanded]="isLineExpanded(group.line)"
+              (click)="toggleLine(group.line, $event)"
+            >
+              <div class="version-history-sheet__major-inner">
+                <span
+                  *ngIf="isCurrentLine(group.line)"
+                  class="version-history-sheet__latest-badge"
+                >最新版本</span>
+                <span class="version-history-sheet__major-version">v{{ group.line }}</span>
+                <time class="version-history-sheet__major-date">{{ formatReleaseDate(group.major) }}</time>
+                <span class="version-history-sheet__major-chevron" aria-hidden="true">
+                  {{ isLineExpanded(group.line) ? '▾' : '▸' }}
+                </span>
+              </div>
+            </button>
           </div>
 
-          <article class="version-history-sheet__card min-w-0 flex-1">
-            <div class="version-history-sheet__meta">
-              <span class="version-history-sheet__version">v{{ release.version }}</span>
-              <time class="version-history-sheet__date">{{ formatReleaseDate(release) }}</time>
-            </div>
-            <h4 *ngIf="release.title" class="version-history-sheet__title">{{ release.title }}</h4>
-
-            <ul *ngIf="release.highlights.length" class="version-history-sheet__bullets">
-              <li *ngFor="let item of release.highlights">{{ item }}</li>
-            </ul>
-
-            <ng-container *ngIf="release.sections?.length">
+          <div
+            class="version-history-sheet__minors"
+            [class.version-history-sheet__minors--open]="isLineExpanded(group.line)"
+          >
+            <div class="version-history-sheet__minors-inner">
               <div
-                *ngFor="let section of release.sections"
-                class="version-history-sheet__section"
+                *ngFor="let release of group.minors; trackBy: trackRelease"
+                class="version-history-sheet__item"
               >
-                <p class="version-history-sheet__section-title">{{ section.heading }}</p>
-                <ul class="version-history-sheet__bullets">
-                  <li *ngFor="let item of section.items">{{ item }}</li>
-                </ul>
+                <div class="version-history-sheet__marker" aria-hidden="true">
+                  <span
+                    class="version-history-sheet__dot"
+                    [class.version-history-sheet__dot--solid]="isCurrentRelease(release.version)"
+                    [class.version-history-sheet__dot--hollow]="!isCurrentRelease(release.version)"
+                  ></span>
+                </div>
+
+                <article class="version-history-sheet__card min-w-0 flex-1">
+                  <div class="version-history-sheet__meta">
+                    <span
+                      *ngIf="isCurrentRelease(release.version)"
+                      class="version-history-sheet__latest-badge"
+                    >最新版本</span>
+                    <span class="version-history-sheet__version">v{{ release.version }}</span>
+                    <time class="version-history-sheet__date">{{ formatReleaseDate(release) }}</time>
+                  </div>
+                  <h4 *ngIf="release.title" class="version-history-sheet__title">{{ release.title }}</h4>
+
+                  <ul *ngIf="release.highlights.length" class="version-history-sheet__bullets">
+                    <li *ngFor="let item of release.highlights">{{ item }}</li>
+                  </ul>
+
+                  <ng-container *ngIf="release.sections?.length">
+                    <div
+                      *ngFor="let section of release.sections"
+                      class="version-history-sheet__section"
+                    >
+                      <p class="version-history-sheet__section-title">{{ section.heading }}</p>
+                      <ul class="version-history-sheet__bullets">
+                        <li *ngFor="let item of section.items">{{ item }}</li>
+                      </ul>
+                    </div>
+                  </ng-container>
+                </article>
               </div>
-            </ng-container>
-          </article>
+            </div>
+          </div>
         </li>
       </ol>
     </div>

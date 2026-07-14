@@ -146,21 +146,47 @@
 }
 
 .version-history-sheet__list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
+
+  /* 整條時間軸不斷線 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0.55rem;
+    bottom: 1.5rem;
+    left: calc(0.375rem - 1px);
+    z-index: 0;
+    width: 2px;
+    background: color-mix(in srgb, var(--theme-peach) 45%, transparent);
+    pointer-events: none;
+  }
+}
+
+.version-history-sheet__group {
+  position: relative;
+  z-index: 1;
 }
 
 .version-history-sheet__item {
+  position: relative;
+  z-index: 1;
   display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
 
-  &--major .version-history-sheet__version {
-    color: var(--color-link);
-    background: color-mix(in srgb, var(--theme-coral) 18%, var(--color-surface));
+  &--major {
+    align-items: center;
+
+    .version-history-sheet__dot {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
   }
 }
 
@@ -168,9 +194,15 @@
   display: flex;
   width: 0.75rem;
   flex-shrink: 0;
-  flex-direction: column;
   align-items: center;
-  padding-top: 0.35rem;
+  justify-content: center;
+  /* 對齊旁邊版號 pill / 大版 bar 的高度中線 */
+  min-height: 1.625rem;
+}
+
+.version-history-sheet__item--major .version-history-sheet__marker {
+  min-height: 0;
+  align-self: stretch;
 }
 
 .version-history-sheet__dot {
@@ -178,16 +210,121 @@
   height: 0.625rem;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--theme-coral) 70%, var(--theme-peach));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-coral) 16%, transparent);
+  box-sizing: border-box;
+}
+
+.version-history-sheet__dot--solid {
+  background: var(--color-link);
+  border: 2px solid var(--color-link);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--theme-coral) 18%, transparent),
+    0 0 0 2px var(--color-surface);
+}
+
+.version-history-sheet__dot--hollow {
+  background: var(--color-surface);
+  border: 2px solid color-mix(in srgb, var(--theme-coral) 55%, var(--theme-peach));
+  box-shadow: 0 0 0 2px var(--color-surface);
 }
 
 .version-history-sheet__line {
-  width: 2px;
-  flex: 1;
-  min-height: 1rem;
-  margin-top: var(--space-1);
-  background: color-mix(in srgb, var(--theme-peach) 45%, transparent);
+  display: none;
+}
+
+/* 緩開緩關：grid rows，不卸 DOM */
+.version-history-sheet__minors {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.version-history-sheet__minors--open {
+  grid-template-rows: 1fr;
+}
+
+.version-history-sheet__minors-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.version-history-sheet__minors--open .version-history-sheet__minors-inner {
+  opacity: 1;
+  transform: none;
+}
+
+.version-history-sheet__major {
+  display: block;
+  width: 100%;
+  padding: 0;
+  padding-bottom: var(--space-3);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.version-history-sheet__group--open .version-history-sheet__major {
+  padding-bottom: var(--space-2);
+}
+
+.version-history-sheet__major-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1.5px solid color-mix(in srgb, var(--theme-coral) 35%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-coral) 14%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--theme-peach) 18%, var(--color-surface)) 100%
+  );
+  padding: var(--space-3) var(--space-3);
+  transition: transform var(--duration-fast) var(--ease-default);
+
+  .version-history-sheet__major:active & {
+    transform: scale(0.98);
+  }
+}
+
+.version-history-sheet__latest-badge {
+  border-radius: var(--radius-full);
+  padding: 0.1rem var(--space-2);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  color: var(--color-btn-primary-text);
+  background: var(--color-link);
+}
+
+.version-history-sheet__major-version {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--color-link);
+}
+
+.version-history-sheet__major-date {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.version-history-sheet__major-chevron {
+  flex-shrink: 0;
+  width: 1rem;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  text-align: center;
+  color: var(--color-link);
 }
 
 .version-history-sheet__card {

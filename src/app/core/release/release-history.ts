@@ -25,40 +25,16 @@ export const CURRENT_APP_VERSION = '16.3.2';
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
 
 /**
- * 版本歷程：依實際發佈整理，非逐筆 git commit。
- * 緊接補推的小修正併入同版，不另開條目。最新在上。
+ * 版本歷程顯示順序（由上往下）：
+ * 大版本線新→舊（16.3 → 16.2 → 16.1）；
+ * 同線內大版本標題在上，小版由下往上遞增（16.3 → 16.3.1 → 16.3.2）。
  */
 export const RELEASE_HISTORY: ReleaseEntry[] = [
   {
-    version: '16.3.2',
-    releasedAt: '2026-07-14T14:57:00+08:00',
-    title: '記帳分攤更聰明、手機輸入更順',
-    highlights: [
-      '細項歸人、剩下的共同均分，不用再自己心算',
-      '手機打字時底部「記一筆」先讓路，鍵盤不擠畫面',
-    ],
-    sections: [
-      {
-        heading: '記帳與分攤',
-        items: [
-          '填了專屬細項後，剩餘金額自動均分給所有參與者',
-          '「全家」可再點一次清空選擇',
-          '多人付款輸入金額時不再每打一字就失焦',
-          '鍵盤開啟時隱藏底部提交列，收起後再顯示',
-        ],
-      },
-      {
-        heading: '還款',
-        items: ['還款超出後可反轉債務方向'],
-      },
-      {
-        heading: '介面細節',
-        items: [
-          '分攤卡片頭像與名字垂直置中',
-          '頂欄名字的下行字母（如 y）不再被裁切',
-        ],
-      },
-    ],
+    version: '16.3',
+    releasedAt: '2026-06-23T17:29:53+08:00',
+    title: '',
+    highlights: [],
   },
   {
     version: '16.3.1',
@@ -104,20 +80,41 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '16.3',
-    releasedAt: '2026-06-23T17:29:53+08:00',
-    title: '',
-    highlights: [],
+    version: '16.3.2',
+    releasedAt: '2026-07-14T14:57:00+08:00',
+    title: '記帳分攤更聰明、手機輸入更順',
+    highlights: [
+      '細項歸人、剩下的共同均分，不用再自己心算',
+      '手機打字時底部「記一筆」先讓路，鍵盤不擠畫面',
+    ],
+    sections: [
+      {
+        heading: '記帳與分攤',
+        items: [
+          '填了專屬細項後，剩餘金額自動均分給所有參與者',
+          '「全家」可再點一次清空選擇',
+          '多人付款輸入金額時不再每打一字就失焦',
+          '鍵盤開啟時隱藏底部提交列，收起後再顯示',
+        ],
+      },
+      {
+        heading: '還款',
+        items: ['還款超出後可反轉債務方向'],
+      },
+      {
+        heading: '介面細節',
+        items: [
+          '分攤卡片頭像與名字垂直置中',
+          '頂欄名字的下行字母（如 y）不再被裁切',
+        ],
+      },
+    ],
   },
   {
-    version: '16.2.2',
-    releasedAt: '2026-06-23T16:43:33+08:00',
-    title: '架構重整與文案集中管理',
-    highlights: [
-      '抽出 copy/ 文案模組',
-      'advance draft、audit diff 與記帳表單重構',
-      'app shell 拆分、樣式模組化',
-    ],
+    version: '16.2',
+    releasedAt: '2026-06-23T09:47:43+08:00',
+    title: '',
+    highlights: [],
   },
   {
     version: '16.2.1',
@@ -130,28 +127,28 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '16.2',
-    releasedAt: '2026-06-23T09:47:43+08:00',
+    version: '16.2.2',
+    releasedAt: '2026-06-23T16:43:33+08:00',
+    title: '架構重整與文案集中管理',
+    highlights: [
+      '抽出 copy/ 文案模組',
+      'advance draft、audit diff 與記帳表單重構',
+      'app shell 拆分、樣式模組化',
+    ],
+  },
+  {
+    version: '16.1',
+    releasedAt: '2026-06-22T09:21:26+08:00',
     title: '',
     highlights: [],
   },
   {
-    version: '16.1.4',
-    releasedAt: '2026-06-22T15:29:35+08:00',
-    title: '代表色、分享預覽與記帳體驗',
+    version: '16.1.1',
+    releasedAt: '2026-06-22T11:19:06+08:00',
+    title: '成員系統與個人化設定初版',
     highlights: [
-      '成員代表色與主題系統擴充',
-      'Open Graph 分享預覽標籤',
-      '記帳頁日期選單排版修正',
-    ],
-  },
-  {
-    version: '16.1.3',
-    releasedAt: '2026-06-22T14:19:18+08:00',
-    title: '品牌視覺與日期顯示強化',
-    highlights: [
-      'app logo、chibi 頭像、kaomoji 裝飾與日期 pipe',
-      '登入與 dashboard 體驗調整',
+      '成員 profile、主題色、頭像與登入流程',
+      '設定頁、member picker、firestore 規則調整',
     ],
   },
   {
@@ -165,19 +162,23 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '16.1.1',
-    releasedAt: '2026-06-22T11:19:06+08:00',
-    title: '成員系統與個人化設定初版',
+    version: '16.1.3',
+    releasedAt: '2026-06-22T14:19:18+08:00',
+    title: '品牌視覺與日期顯示強化',
     highlights: [
-      '成員 profile、主題色、頭像與登入流程',
-      '設定頁、member picker、firestore 規則調整',
+      'app logo、chibi 頭像、kaomoji 裝飾與日期 pipe',
+      '登入與 dashboard 體驗調整',
     ],
   },
   {
-    version: '16.1',
-    releasedAt: '2026-06-22T09:21:26+08:00',
-    title: '',
-    highlights: [],
+    version: '16.1.4',
+    releasedAt: '2026-06-22T15:29:35+08:00',
+    title: '代表色、分享預覽與記帳體驗',
+    highlights: [
+      '成員代表色與主題系統擴充',
+      'Open Graph 分享預覽標籤',
+      '記帳頁日期選單排版修正',
+    ],
   },
 ];
 
