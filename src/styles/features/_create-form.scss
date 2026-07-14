@@ -222,6 +222,12 @@
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
 }
 
+.create-amount-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
 .input-amount--suggested {
   color: var(--color-text-hint);
   font-weight: var(--font-weight-regular);

@@ -6,6 +6,7 @@ import {
 } from '../models';
 import { COPY_ERRORS } from '../../copy';
 import { primaryPayerId, validateAdvancePayers } from '../transactions/advance-allocation';
+import { applyServiceFeeToSplitPreview } from './service-fee-split';
 
 export interface SplitPreviewLine {
   memberId: string;
@@ -139,11 +140,12 @@ export function calculateEqualSplit(
 export function calculateItemizedSplit(
   totalAmount: number,
   participantIds: string[],
-  manualAmounts: Record<string, number>
+  manualAmounts: Record<string, number>,
+  excludedIds: Set<string> = new Set()
 ): SplitPreview {
   const lines: SplitPreviewLine[] = participantIds.map((memberId) => ({
     memberId,
-    amount: manualAmounts[memberId] ?? 0,
+    amount: excludedIds.has(memberId) ? 0 : manualAmounts[memberId] ?? 0,
     isRemainderBearer: false,
     remainderAmount: 0,
   }));
@@ -165,6 +167,7 @@ export function buildSplitPreview(
       ? members.map((m) => m.id)
       : input.participantIds;
   const excluded = new Set(input.excludedMemberIds ?? []);
+  const payingIds = allParticipantIds.filter((id) => !excluded.has(id));
   const payers =
     input.payers?.length ?
       input.payers
@@ -172,23 +175,39 @@ export function buildSplitPreview(
       [{ memberId: input.payerId, amount: input.totalAmount }]
     : [];
   const primaryPayer = primaryPayerId(payers);
+  const seed = input.remainderSeed ?? `${input.title}-${Date.now()}`;
+  const serviceFee = Math.max(0, input.serviceFee ?? 0);
+  const subtotal = Math.max(0, input.totalAmount - serviceFee);
 
+  let preview: SplitPreview;
   if (input.splitMode === 'equal') {
-    const seed = input.remainderSeed ?? `${input.title}-${Date.now()}`;
-    return calculateEqualSplit(
-      input.totalAmount,
+    preview = calculateEqualSplit(
+      subtotal,
       allParticipantIds,
       primaryPayer,
       seed,
       excluded
     );
+  } else {
+    preview = calculateItemizedSplit(
+      subtotal,
+      allParticipantIds,
+      input.manualAmounts ?? {},
+      excluded
+    );
   }
 
-  return calculateItemizedSplit(
-    input.totalAmount,
-    allParticipantIds,
-    input.manualAmounts ?? {}
-  );
+  if (serviceFee > 0) {
+    preview = applyServiceFeeToSplitPreview(
+      preview,
+      serviceFee,
+      payingIds,
+      primaryPayer,
+      seed
+    );
+  }
+
+  return preview;
 }
 
 export function previewToParticipants(

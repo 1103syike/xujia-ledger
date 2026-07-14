@@ -89,6 +89,8 @@ export interface BuildAdvanceInputParams {
   customInputMethod: CustomInputMethod;
   splitTotal: number;
   chartBillTotal: number | null;
+  serviceFee?: number | null;
+  consumptionTotal?: number | null;
   payers: AdvancePayer[];
   members: Member[];
   excludedMemberIds: string[];
@@ -114,6 +116,7 @@ export function buildAdvanceInputFromDraft(
     date: params.date,
     totalAmount: params.splitTotal,
     billTotal: params.chartBillTotal,
+    serviceFee: params.serviceFee ?? null,
     payerId: params.payers[0]?.memberId ?? '',
     payers: params.payers,
     participantScope: 'all',

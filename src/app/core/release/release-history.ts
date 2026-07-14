@@ -9,22 +9,22 @@ export type ReleaseEntry = {
   title: string;
   highlights: string[];
   sections?: ReleaseSection[];
-  /** 顯示含時分秒的發佈時間 */
-  detailedTime?: boolean;
 };
 
-/** 目前 App 版本（對應最新一筆 release） */
+/** 目前 App 版本 */
 export const CURRENT_APP_VERSION = '3.1.0';
 
+/** 此日期起顯示含時分的發佈時間 */
+const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
+
 /**
- * 版本歷程：由 git 紀錄整理，語意化版本獨立於 commit 訊息。
- * 最新在上、最舊在下。
+ * 版本歷程：依實際發佈整理，非逐筆 git commit。
+ * 緊接補推的小修正併入同版，不另開條目。最新在上。
  */
 export const RELEASE_HISTORY: ReleaseEntry[] = [
   {
     version: '3.1.0',
     releasedAt: '2026-06-24T17:29:03+08:00',
-    detailedTime: true,
     title: '強化動效體驗、導覽轉場與帳本 UI 還原補齊',
     highlights: [],
     sections: [
@@ -68,7 +68,6 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
   {
     version: '3.0.0',
     releasedAt: '2026-06-23T17:29:53+08:00',
-    detailedTime: true,
     title: 'core 目錄分層與設計系統',
     highlights: [
       'utils 拆為 ledger／display／infra／consolidation',
@@ -78,7 +77,6 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
   {
     version: '2.2.0',
     releasedAt: '2026-06-23T16:43:33+08:00',
-    detailedTime: true,
     title: '架構重整與文案集中管理',
     highlights: [
       '抽出 copy/ 文案模組',
@@ -87,16 +85,8 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '2.1.1',
-    releasedAt: '2026-06-23T13:56:10+08:00',
-    detailedTime: true,
-    title: '加深頭像選擇器已選狀態對比色',
-    highlights: ['修正代表色預覽在淺色背景下不易辨識'],
-  },
-  {
     version: '2.1.0',
     releasedAt: '2026-06-23T13:51:25+08:00',
-    detailedTime: true,
     title: '墊付分攤、整合欠款與利息結算',
     highlights: [
       'advance allocation、debt consolidation、interest calculator',
@@ -105,48 +95,23 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '2.0.2',
-    releasedAt: '2026-06-23T09:53:52+08:00',
-    detailedTime: true,
-    title: '修正分享預覽圖標籤語法',
-    highlights: ['修正 og:image 缺少結尾引號'],
-  },
-  {
-    version: '2.0.1',
-    releasedAt: '2026-06-23T09:51:32+08:00',
-    detailedTime: true,
-    title: '更新分享預覽圖',
-    highlights: ['og:image 改為角色群組圖'],
-  },
-  {
     version: '2.0.0',
     releasedAt: '2026-06-23T09:47:43+08:00',
-    detailedTime: true,
     title: '交易模型重構與帳本服務升級',
     highlights: [
       'expense 遷移為 transaction 服務與 ledger 計算',
       '自訂頭像上傳、成員帳本頁、登入偏好',
+      '分享預覽圖與 og 標籤微調',
     ],
   },
   {
-    version: '1.4.2',
-    releasedAt: '2026-06-22T15:29:35+08:00',
-    title: '新增 Open Graph 分享預覽',
-    highlights: ['og:title、description、image 等社群分享標籤'],
-  },
-  {
-    version: '1.4.1',
-    releasedAt: '2026-06-22T15:04:49+08:00',
-    title: '修正記帳頁日期選單爆版',
-    highlights: ['抽出 date-field 元件並調整樣式'],
-  },
-  {
     version: '1.4.0',
-    releasedAt: '2026-06-22T14:41:35+08:00',
-    title: '成員代表色與主題系統擴充',
+    releasedAt: '2026-06-22T15:29:35+08:00',
+    title: '代表色、分享預覽與記帳體驗',
     highlights: [
-      'member profile 色票與 member-color 工具',
-      '設定頁代表色選擇',
+      '成員代表色與主題系統擴充',
+      'Open Graph 分享預覽標籤',
+      '記帳頁日期選單排版修正',
     ],
   },
   {
@@ -159,18 +124,13 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '1.2.1',
-    releasedAt: '2026-06-22T13:25:57+08:00',
-    title: '修正行動裝置點擊輸入時畫面放大',
-    highlights: ['調整 viewport 與 touch 相關樣式'],
-  },
-  {
     version: '1.2.0',
     releasedAt: '2026-06-22T13:19:45+08:00',
     title: '正式版核心功能補齊',
     highlights: [
       '首頁帳務洞察、記帳流程擴充、異動紀錄格式化',
       'confirm dialog、kaomoji loading、pending 頁',
+      '行動裝置點擊輸入不再意外放大',
     ],
   },
   {
@@ -195,7 +155,9 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
 
 export function formatReleaseDate(entry: ReleaseEntry): string {
   const date = new Date(entry.releasedAt);
-  if (entry.detailedTime) {
+  const useDetailed = date >= DETAILED_TIME_CUTOFF;
+
+  if (useDetailed) {
     return date.toLocaleString('zh-TW', {
       year: 'numeric',
       month: 'numeric',
@@ -205,6 +167,7 @@ export function formatReleaseDate(entry: ReleaseEntry): string {
       hour12: false,
     });
   }
+
   return date.toLocaleDateString('zh-TW', {
     year: 'numeric',
     month: 'numeric',
@@ -216,4 +179,20 @@ export function isMajorBump(prev: string, next: string): boolean {
   const [pMaj] = prev.split('.').map(Number);
   const [nMaj] = next.split('.').map(Number);
   return nMaj > pMaj;
+}
+
+/** 語意化大版本（x.0.0），含初版 1.0.0 */
+export function isMajorRelease(version: string): boolean {
+  const [major, minor, patch] = version.split('.').map(Number);
+  return minor === 0 && patch === 0;
+}
+
+export function isHighlightedRelease(
+  index: number,
+  releases: ReleaseEntry[]
+): boolean {
+  const entry = releases[index];
+  if (isMajorRelease(entry.version)) return true;
+  if (index >= releases.length - 1) return false;
+  return isMajorBump(releases[index + 1].version, entry.version);
 }

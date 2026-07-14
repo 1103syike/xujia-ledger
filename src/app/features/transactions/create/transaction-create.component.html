@@ -116,6 +116,7 @@
               type="button"
               class="create-quick-chip"
               [class.create-quick-chip--active]="isAllGroupActive()"
+              [attr.aria-pressed]="isAllGroupActive()"
               (click)="selectAllParticipants()"
             >
               全家
@@ -124,8 +125,9 @@
               *ngFor="let m of members"
               type="button"
               class="create-quick-chip"
-              [class.create-quick-chip--active]="isSingleMemberActive(m.id)"
-              (click)="selectSingleMember(m.id)"
+              [class.create-quick-chip--active]="isMemberParticipating(m.id)"
+              [attr.aria-pressed]="isMemberParticipating(m.id)"
+              (click)="toggleParticipantMember(m.id)"
             >
               {{ m.name }}
             </button>
@@ -158,17 +160,35 @@
             </div>
           </div>
 
-          <div class="field-group mt-3">
-            <label class="field-label">消費總額</label>
-            <input
-              formControlName="totalAmount"
-              type="number"
-              inputmode="numeric"
-              class="input input-amount"
-              placeholder="0"
-              (blur)="onSplitTotalCommit()"
-            />
+          <div class="create-amount-fields mt-3">
+            <div class="field-group">
+              <label class="field-label">{{ create.consumptionTotal }}</label>
+              <input
+                formControlName="totalAmount"
+                type="number"
+                inputmode="numeric"
+                class="input input-amount"
+                placeholder="0"
+                (blur)="onSplitTotalCommit()"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">{{ create.serviceFee }}</label>
+              <input
+                formControlName="serviceFee"
+                type="number"
+                inputmode="numeric"
+                class="input input-amount"
+                placeholder="0"
+                (blur)="onSplitTotalCommit()"
+              />
+              <p class="caption-text mt-1">{{ create.serviceFeeHint }}</p>
+            </div>
           </div>
+
+          <p *ngIf="serviceFeeTotal > 0 && effectiveTotal > 0" class="caption-text mt-2">
+            含服務費共 NT$ {{ effectiveTotal }}
+          </p>
 
           <div class="stack-sm mt-3">
             <div
@@ -379,10 +399,10 @@
                 type="number"
                 inputmode="numeric"
                 class="input input-amount"
-                [placeholder]="repaymentBalance ? '結清 NT$ ' + repaymentBalance : '0'"
+                [placeholder]="repaymentBalance ? 'NT$ ' + repaymentBalance : '0'"
               />
               <p *ngIf="repaymentBalance" class="helper-text mt-1">
-                待還 NT$ {{ repaymentBalance }} · 留空或超過則結清
+                待還 NT$ {{ repaymentBalance }} · 留空則結清，可輸入超過金額
               </p>
             </div>
             <div class="create-date-field">

@@ -14,6 +14,7 @@ export interface CreateFormSnapshot {
     title: string;
     date: string;
     totalAmount: number | null;
+    serviceFee: number | null;
     billTotal: number | null;
     skippedMembers: string[];
     memberItems: Record<string, LineItem[]>;
@@ -67,6 +68,7 @@ export function serializeCreateFormSnapshot(
       title: snapshot.advance.title.trim(),
       date: snapshot.advance.date,
       totalAmount: snapshot.advance.totalAmount,
+      serviceFee: snapshot.advance.serviceFee,
       billTotal: snapshot.advance.billTotal,
       skippedMembers: sortStrings(snapshot.advance.skippedMembers),
       memberItems: normalizeLineItems(snapshot.advance.memberItems),

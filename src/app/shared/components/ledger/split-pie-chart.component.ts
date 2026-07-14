@@ -52,10 +52,14 @@ export class SplitPieChartComponent implements OnChanges {
 
   private rebuild(): void {
     const positive = this.slices.filter((s) => s.amount > 0);
+    const sliceSum = positive.reduce((sum, s) => sum + s.amount, 0);
+
     this.assignedTotal =
-      this.totalAmount > 0
-        ? this.totalAmount
-        : positive.reduce((sum, s) => sum + s.amount, 0);
+      sliceSum > 0
+        ? sliceSum
+        : this.totalAmount > 0
+          ? this.totalAmount
+          : 0;
 
     const bill =
       this.billTotal != null && this.billTotal > this.assignedTotal

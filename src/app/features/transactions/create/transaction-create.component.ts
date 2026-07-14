@@ -49,6 +49,10 @@ import { filterManualLineItems } from '../../../core/transactions/advance-displa
 import { distributePayerAmounts } from '../../../core/transactions/payer-distribution';
 import { distributeSplitAmounts } from '../../../core/transactions/split-distribution';
 import {
+  serviceFeeSharesByMember,
+  subtractServiceFeeFromAmounts,
+} from '../../../core/transactions/service-fee-split';
+import {
   dayBeforeYesterdayLocalDate,
   lastParticipantGroup,
   participantGroupKey,
@@ -142,6 +146,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   memberItems: Record<string, LineItem[]> = {};
   memberDrafts: Record<string, MemberDraft> = {};
   memberSubtotals: Record<string, number> = {};
+  memberBaseSubtotals: Record<string, number> = {};
   manualAmounts: Record<string, number> = {};
   preview: SplitPreview | null = null;
   previewSlices: Array<{ memberId: string; amount: number }> = [];
@@ -207,6 +212,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       title: ['', Validators.required],
       date: [todayLocalDate(), Validators.required],
       totalAmount: [null, [Validators.min(1)]],
+      serviceFee: [null, [Validators.min(0)]],
       billTotal: [null, [Validators.min(1)]],
     });
     this.payerRows = [{ memberId: defaultPayer, amount: '', locked: false }];
@@ -385,6 +391,10 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
           v.totalAmount === null || v.totalAmount === ''
             ? null
             : Number(v.totalAmount),
+        serviceFee:
+          v.serviceFee === null || v.serviceFee === ''
+            ? null
+            : Number(v.serviceFee),
         billTotal:
           v.billTotal === null || v.billTotal === ''
             ? null
@@ -471,7 +481,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.syncRepaymentAmountToBalance();
   }
 
-  /** 留空或超過待還 → 結清；否則還輸入金額 */
+  /** 留空 → 結清；否則還輸入金額（允許超額） */
   resolveRepaymentAmount(): number {
     const balance = this.repaymentBalance ?? 0;
     if (balance <= 0) return 0;
@@ -486,7 +496,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       return balance;
     }
 
-    return Math.min(typed, balance);
+    return typed;
   }
 
   private syncRepaymentAmountToBalance(): void {
@@ -573,7 +583,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     const inferred = inferSplitDraftMode({
       allMemberIds: this.members.map((m) => m.id),
       excludedMemberIds: [...this.skippedMembers],
-      totalAmount: this.effectiveTotal,
+      totalAmount: this.consumptionSubtotal(),
       manualAmounts: this.manualAmounts,
       memberItems: this.memberItems,
       splitLockedIds: [...this.splitLocked],
@@ -666,11 +676,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     );
   }
 
-  isSingleMemberActive(memberId: string): boolean {
-    const participating = this.members
-      .filter((m) => !this.isSkipped(m.id))
-      .map((m) => m.id);
-    return participating.length === 1 && participating[0] === memberId;
+  isMemberParticipating(memberId: string): boolean {
+    return !this.isSkipped(memberId);
   }
 
   selectAllParticipants(): void {
@@ -678,9 +685,16 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
-  selectSingleMember(memberId: string): void {
-    this.applyParticipantMemberIds([memberId]);
-    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  toggleParticipantMember(memberId: string): void {
+    if (this.isSkipped(memberId)) {
+      this.toggleSkip(memberId);
+      return;
+    }
+
+    const activeCount = this.members.filter((m) => !this.isSkipped(m.id)).length;
+    if (activeCount <= 1) return;
+
+    this.toggleSkip(memberId);
   }
 
   toggleParticipantTuning(): void {
@@ -816,6 +830,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       title: '',
       date: todayLocalDate(),
       totalAmount: null,
+      serviceFee: null,
       billTotal: null,
     });
     this.payerRows = [{ memberId: defaultPayer, amount: '', locked: false }];
@@ -1006,11 +1021,13 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private syncSplitAmounts(): void {
-    const total = Number(this.advanceForm.value.totalAmount) || 0;
-    if (total <= 0) return;
+    const subtotal = Number(this.advanceForm.value.totalAmount) || 0;
+    if (subtotal <= 0) return;
 
     const participating = this.members.filter((m) => !this.isSkipped(m.id));
     if (participating.length === 0) return;
+
+    this.clearStaleSplitLocksForLineItemMode();
 
     const rows = participating.map((m) => {
       const items = this.memberItems[m.id] ?? [];
@@ -1021,7 +1038,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       return { amount, locked };
     });
 
-    const amounts = distributeSplitAmounts(total, rows);
+    const amounts = distributeSplitAmounts(subtotal, rows);
     const nextManual = { ...this.manualAmounts };
     const nextInputs = { ...this.splitAmountInputs };
 
@@ -1037,7 +1054,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private syncPayerAmounts(): void {
-    const splitTotal = this.computeEffectiveTotal();
+    const splitTotal = this.effectiveTotal;
     if (splitTotal <= 0 || this.payerRows.length === 0) return;
 
     const states = this.payerRows.map((row) => ({
@@ -1132,6 +1149,9 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.effectiveTotal = this.computeEffectiveTotal();
     if (options?.syncSplits) {
       this.syncSplitAmounts();
+      this.syncAmountsFromItems();
+      this.syncTotalAmountFieldFromSplits();
+      this.effectiveTotal = this.computeEffectiveTotal();
     }
     if (options?.syncPayers) {
       this.syncPayerAmounts();
@@ -1145,7 +1165,28 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       return;
     }
     this.preview = buildSplitPreview(input, this.members);
-    this.previewSlices = this.preview.lines.map((line) => ({ memberId: line.memberId, amount: line.amount }));
+    this.previewSlices = this.preview.lines
+      .filter((line) => !this.isSkipped(line.memberId) && line.amount > 0)
+      .map((line) => ({ memberId: line.memberId, amount: line.amount }));
+  }
+
+  /** 逐項記帳時，其他人不應保留舊的手動鎖定分攤（常與實付金額混淆） */
+  private clearStaleSplitLocksForLineItemMode(): void {
+    const hasAnyLineItems = Object.values(this.memberItems).some(
+      (items) => items.length > 0
+    );
+    if (!hasAnyLineItems) return;
+
+    for (const m of this.members) {
+      if (this.isSkipped(m.id)) continue;
+      if (this.memberHasLineItems(m.id)) continue;
+      if (!this.splitLocked.has(m.id)) continue;
+
+      this.splitLocked.delete(m.id);
+      const nextInputs = { ...this.splitAmountInputs };
+      delete nextInputs[m.id];
+      this.splitAmountInputs = nextInputs;
+    }
   }
 
   submitAdvance(): void {
@@ -1278,29 +1319,52 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private computeEffectiveTotal(): number {
+    return this.consumptionSubtotal() + this.serviceFeeAmount();
+  }
+
+  private consumptionSubtotal(): number {
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
-    if (fromField > 0) return fromField;
-    return this.sumParticipatingSplits();
-  }
-
-  private sumParticipatingSplits(): number {
-    return this.members
-      .filter((m) => !this.isSkipped(m.id))
-      .reduce((sum, m) => sum + (this.memberSubtotals[m.id] ?? 0), 0);
-  }
-
-  /** 逐項記帳時讓消費總額跟品項合計同步；未填總額時亦帶入分攤合計 */
-  private syncTotalAmountFieldFromSplits(): void {
-    const fromSplits = this.sumParticipatingSplits();
     const hasLineItems = Object.values(this.memberItems).some(
       (items) => items.length > 0
     );
+    const hasManualSplits = this.splitLocked.size > 0;
 
-    if (hasLineItems) {
-      this.advanceForm.patchValue(
-        { totalAmount: fromSplits > 0 ? fromSplits : null },
-        { emitEvent: false }
-      );
+    if (hasLineItems || hasManualSplits) {
+      const fromSplits = this.sumBaseParticipatingSplits();
+      return fromSplits > 0 ? fromSplits : fromField;
+    }
+
+    return fromField;
+  }
+
+  get serviceFeeTotal(): number {
+    return this.serviceFeeAmount();
+  }
+
+  private serviceFeeAmount(): number {
+    return Math.max(0, Number(this.advanceForm.value.serviceFee) || 0);
+  }
+
+  private sumBaseParticipatingSplits(): number {
+    return this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .reduce((sum, m) => sum + (this.memberBaseSubtotals[m.id] ?? 0), 0);
+  }
+
+  private sumParticipatingSplits(): number {
+    return this.sumBaseParticipatingSplits() + this.serviceFeeAmount();
+  }
+
+  /** 逐項記帳或手動分攤時讓消費總額跟合計同步；未填總額時亦帶入分攤合計（不含服務費） */
+  private syncTotalAmountFieldFromSplits(): void {
+    const fromSplits = this.sumBaseParticipatingSplits();
+    const hasLineItems = Object.values(this.memberItems).some(
+      (items) => items.length > 0
+    );
+    const hasManualSplits = this.splitLocked.size > 0;
+
+    if ((hasLineItems || hasManualSplits) && fromSplits > 0) {
+      this.advanceForm.patchValue({ totalAmount: fromSplits }, { emitEvent: false });
       return;
     }
 
@@ -1317,7 +1381,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private syncAmountsFromItems(): void {
-    const subtotals: Record<string, number> = {};
+    const baseSubtotals: Record<string, number> = {};
     for (const m of this.members) {
       const items = this.memberItems[m.id] ?? [];
       const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
@@ -1326,12 +1390,46 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
         : items.length > 0
           ? fromItems
           : this.manualAmounts[m.id] ?? 0;
-      subtotals[m.id] = amount;
+      baseSubtotals[m.id] = amount;
       if (!this.isSkipped(m.id)) {
         this.manualAmounts = { ...this.manualAmounts, [m.id]: amount };
       }
     }
+    this.memberBaseSubtotals = baseSubtotals;
+    this.applyServiceFeeToMemberSubtotals();
+  }
+
+  private applyServiceFeeToMemberSubtotals(): void {
+    const shares = this.computeServiceFeeShares();
+    const subtotals: Record<string, number> = {};
+    for (const m of this.members) {
+      const base = this.memberBaseSubtotals[m.id] ?? 0;
+      subtotals[m.id] =
+        this.isSkipped(m.id) ? 0 : base + (shares[m.id] ?? 0);
+    }
     this.memberSubtotals = subtotals;
+  }
+
+  private computeServiceFeeShares(): Record<string, number> {
+    const fee = this.serviceFeeAmount();
+    if (fee <= 0) return {};
+
+    const payingIds = this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .map((m) => m.id);
+    if (payingIds.length === 0) return {};
+
+    const payerId =
+      this.payerRows.find((row) => row.memberId)?.memberId ??
+      this.auth.currentMember?.id ??
+      payingIds[0];
+    const shares = serviceFeeSharesByMember(
+      fee,
+      payingIds,
+      payerId,
+      this.remainderSeed
+    );
+    return Object.fromEntries(shares);
   }
 
   private buildAdvanceInput(): CreateAdvanceInput {
@@ -1346,7 +1444,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     const inferred = inferSplitDraftMode({
       allMemberIds: this.members.map((m) => m.id),
       excludedMemberIds: [...this.skippedMembers],
-      totalAmount: this.effectiveTotal,
+      totalAmount: this.consumptionSubtotal(),
       manualAmounts: this.manualAmounts,
       memberItems: this.memberItems,
       splitLockedIds: [...this.splitLocked],
@@ -1358,6 +1456,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       splitRule: inferred.splitRule,
       customInputMethod: inferred.customInputMethod,
       splitTotal: this.effectiveTotal,
+      serviceFee: this.serviceFeeAmount() || null,
       chartBillTotal: this.chartBillTotal,
       payers,
       members: this.members,
@@ -1420,10 +1519,15 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       tx.participants.filter((p) => p.amount === 0).map((p) => p.memberId)
     );
 
+    const serviceFee = tx.serviceFee ?? 0;
+    const consumptionTotal =
+      serviceFee > 0 ? Math.max(0, tx.totalAmount - serviceFee) : tx.totalAmount;
+
     this.advanceForm.patchValue({
       title: tx.title,
       date: tx.date ?? todayLocalDate(),
-      totalAmount: tx.totalAmount,
+      totalAmount: consumptionTotal,
+      serviceFee: serviceFee > 0 ? serviceFee : null,
       billTotal: tx.billTotal ?? null,
     });
 
@@ -1447,18 +1551,24 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
         }
       }
       this.memberItems = items;
-    } else if (this.splitRule === 'custom' && this.customInputMethod === 'direct') {
-      const amounts: Record<string, number> = {};
-      for (const p of tx.participants) {
-        amounts[p.memberId] = p.amount;
-      }
-      this.manualAmounts = amounts;
     } else {
       const amounts: Record<string, number> = {};
       for (const p of tx.participants) {
         amounts[p.memberId] = p.amount;
       }
-      this.manualAmounts = amounts;
+      const payingIds = tx.participants
+        .filter((p) => p.amount > 0)
+        .map((p) => p.memberId);
+      this.manualAmounts =
+        serviceFee > 0
+          ? subtractServiceFeeFromAmounts(
+              amounts,
+              serviceFee,
+              payingIds,
+              tx.payerId,
+              tx.id
+            )
+          : amounts;
     }
 
     const participating = tx.participants
@@ -1470,8 +1580,9 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     if (inferred.splitRule === 'custom') {
       for (const p of tx.participants) {
         if (p.amount > 0) {
+          const baseAmount = this.manualAmounts[p.memberId] ?? p.amount;
           this.splitLocked.add(p.memberId);
-          this.splitAmountInputs[p.memberId] = String(p.amount);
+          this.splitAmountInputs[p.memberId] = String(baseAmount);
         }
       }
     }

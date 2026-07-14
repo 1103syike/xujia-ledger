@@ -29,6 +29,7 @@
           <p class="helper-text mt-1 mb-0">
             目前版本
             <span class="version-history-sheet__current">v{{ currentVersion }}</span>
+            <span class="version-history-sheet__legend">· 珊瑚色為大版本</span>
           </p>
         </div>
         <button
@@ -46,7 +47,7 @@
         <li
           *ngFor="let release of releases; let i = index; trackBy: trackRelease"
           class="version-history-sheet__item"
-          [class.version-history-sheet__item--major]="isMajorBump(i)"
+          [class.version-history-sheet__item--major]="isMajorRelease(i)"
         >
           <div class="version-history-sheet__marker" aria-hidden="true">
             <span class="version-history-sheet__dot"></span>

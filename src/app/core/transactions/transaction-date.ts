@@ -64,6 +64,7 @@ interface LegacyExpenseDoc {
   date?: string;
   totalAmount: number;
   billTotal?: number | null;
+  serviceFee?: number | null;
   payerId: string;
   participantScope?: Transaction['participantScope'];
   participantIds?: string[];
@@ -172,6 +173,7 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     date: normalizeTransactionDate(raw),
     totalAmount: raw.totalAmount,
     billTotal: raw.billTotal ?? null,
+    serviceFee: raw.serviceFee ?? null,
     payerId: raw.payerId,
     payers: raw.payers,
     changeAmount: raw.changeAmount ?? null,

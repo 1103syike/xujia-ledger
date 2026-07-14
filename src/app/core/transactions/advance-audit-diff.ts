@@ -108,6 +108,17 @@ export function diffAdvanceUpdate(
     );
   }
 
+  const beforeServiceFee = before.serviceFee ?? null;
+  const afterServiceFee = after.serviceFee ?? null;
+  if (beforeServiceFee !== afterServiceFee) {
+    pushChange(
+      changes,
+      '服務費',
+      beforeServiceFee != null ? `NT$ ${beforeServiceFee}` : '—',
+      afterServiceFee != null ? `NT$ ${afterServiceFee}` : '—'
+    );
+  }
+
   const beforeNote = normalizeNote(before.note);
   const afterNote = normalizeNote(after.note);
   if (beforeNote !== afterNote) {

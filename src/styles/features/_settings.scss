@@ -134,6 +134,10 @@
   color: var(--color-link);
 }
 
+.version-history-sheet__legend {
+  color: var(--color-text-muted);
+}
+
 .version-history-sheet__scroll {
   flex: 1;
   min-height: 0;

@@ -5,7 +5,7 @@ import {
   RELEASE_HISTORY,
   ReleaseEntry,
   formatReleaseDate,
-  isMajorBump,
+  isHighlightedRelease,
 } from '../../../core/release/release-history';
 import { sheetOverlay, sheetPanel } from '../../../animations/route.animations';
 
@@ -24,9 +24,8 @@ export class VersionHistorySheetComponent {
   readonly releases = RELEASE_HISTORY;
   formatReleaseDate = formatReleaseDate;
 
-  isMajorBump(index: number): boolean {
-    if (index >= this.releases.length - 1) return false;
-    return isMajorBump(this.releases[index + 1].version, this.releases[index].version);
+  isMajorRelease(index: number): boolean {
+    return isHighlightedRelease(index, this.releases);
   }
 
   trackRelease(_index: number, entry: ReleaseEntry): string {
