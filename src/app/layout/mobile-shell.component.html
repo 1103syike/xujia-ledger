@@ -22,7 +22,7 @@
           >
             <ng-container *ngIf="auth.currentMember as member">
               <app-member-avatar
-                class="shrink-0"
+                class="flex shrink-0 justify-center"
                 [member]="member"
                 [size]="headerCompact ? 'sm' : 'lg'"
               />
@@ -32,7 +32,7 @@
                 [class.items-center]="headerCompact"
               >
                 <p
-                  class="truncate font-bold leading-none text-ink transition-[font-size] duration-200"
+                  class="truncate font-bold leading-tight text-ink transition-[font-size] duration-200"
                   [class.text-sm]="headerCompact"
                   [class.text-base]="!headerCompact"
                 >

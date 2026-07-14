@@ -154,7 +154,7 @@
 
 .itemized-member-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
 }
@@ -188,6 +188,11 @@
   justify-content: space-between;
   gap: var(--space-2);
   @extend .body-text;
+}
+
+.itemized-member-card__item-row--shared {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .itemized-member-card__add-btn {

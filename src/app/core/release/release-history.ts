@@ -12,7 +12,7 @@ export type ReleaseEntry = {
 };
 
 /** 目前 App 版本 */
-export const CURRENT_APP_VERSION = '3.1.0';
+export const CURRENT_APP_VERSION = '3.2.0';
 
 /** 此日期起顯示含時分的發佈時間 */
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
@@ -22,6 +22,37 @@ const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
  * 緊接補推的小修正併入同版，不另開條目。最新在上。
  */
 export const RELEASE_HISTORY: ReleaseEntry[] = [
+  {
+    version: '3.2.0',
+    releasedAt: '2026-07-14T14:57:00+08:00',
+    title: '記帳分攤更聰明、手機輸入更順',
+    highlights: [
+      '細項歸人、剩下的共同均分，不用再自己心算',
+      '手機打字時底部「記一筆」先讓路，鍵盤不擠畫面',
+    ],
+    sections: [
+      {
+        heading: '記帳與分攤',
+        items: [
+          '填了專屬細項後，剩餘金額自動均分給所有參與者',
+          '「全家」可再點一次清空選擇',
+          '多人付款輸入金額時不再每打一字就失焦',
+          '鍵盤開啟時隱藏底部提交列，收起後再顯示',
+        ],
+      },
+      {
+        heading: '還款',
+        items: ['還款超出後可反轉債務方向'],
+      },
+      {
+        heading: '介面細節',
+        items: [
+          '分攤卡片頭像與名字垂直置中',
+          '頂欄名字的下行字母（如 y）不再被裁切',
+        ],
+      },
+    ],
+  },
   {
     version: '3.1.0',
     releasedAt: '2026-06-24T17:29:03+08:00',

@@ -13,6 +13,12 @@
   padding: var(--space-3) var(--layout-page-padding-x);
   padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--theme-ink) 6%, transparent);
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.create-submit-bar--keyboard {
+  transform: translateY(100%);
+  pointer-events: none;
 }
 
 .create-form-scroll {

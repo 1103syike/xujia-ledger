@@ -29,3 +29,24 @@ export function distributeSplitAmounts(
 
   return amounts;
 }
+
+/**
+ * 細項混合分攤：專屬細項歸人，剩餘全數均分給所有參與者。
+ * 例：總額 521、A 專屬 83、B 專屬 25 → 剩 413 均分 → A 290、B 231
+ */
+export function distributeHybridSplitAmounts(
+  splitTotal: number,
+  exclusiveAmounts: number[]
+): number[] {
+  const n = exclusiveAmounts.length;
+  if (n === 0) return [];
+  if (splitTotal <= 0) return exclusiveAmounts.map(() => 0);
+
+  const exclusives = exclusiveAmounts.map((amount) => Math.max(0, amount));
+  const exclusiveSum = exclusives.reduce((sum, amount) => sum + amount, 0);
+  let remainder = splitTotal - exclusiveSum;
+  if (remainder < 0) remainder = 0;
+
+  const shares = splitEqually(remainder, n);
+  return exclusives.map((exclusive, index) => exclusive + shares[index]);
+}

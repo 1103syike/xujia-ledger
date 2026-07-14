@@ -17,7 +17,11 @@
         </div>
       </div>
 
-      <div *ngIf="mode === 'advance'" class="create-submit-bar">
+      <div
+        *ngIf="mode === 'advance'"
+        class="create-submit-bar"
+        [class.create-submit-bar--keyboard]="isFormFieldFocused"
+      >
         <div class="create-submit-bar__inner">
           <div *ngIf="effectiveTotal > 0 || payerTotal > 0" class="advance-sticky-summary">
             <span>分攤 NT$ {{ stickySummary.splitTotal }}</span>
@@ -46,6 +50,8 @@
         id="create-advance-form"
         [formGroup]="advanceForm"
         (ngSubmit)="submitAdvance()"
+        (focusin)="onFormFocusIn($event)"
+        (focusout)="onFormFocusOut($event)"
         class="stack-lg create-form-scroll"
       >
         <!-- ① 發生什麼事 -->
@@ -236,6 +242,13 @@
                     <span class="shrink-0 font-medium">NT$ {{ item.amount }}</span>
                     <button type="button" class="caption-text shrink-0 text-coral" (click)="removeMemberItem(m.id, i)">移除</button>
                   </div>
+                  <div
+                    *ngIf="memberCommonShare(m.id) > 0"
+                    class="itemized-member-card__item-row itemized-member-card__item-row--shared"
+                  >
+                    <span class="min-w-0 flex-1 truncate">共同消費</span>
+                    <span class="shrink-0 font-medium">NT$ {{ memberCommonShare(m.id) }}</span>
+                  </div>
                 </div>
 
                 <button
@@ -269,6 +282,7 @@
           </div>
 
           <p *ngIf="equalPerPersonLabel" class="equal-split-summary mt-3">{{ equalPerPersonLabel }}</p>
+          <p *ngIf="sharedRemainderLabel" class="equal-split-summary mt-3">{{ sharedRemainderLabel }}</p>
         </div>
 
         <div *ngIf="preview && effectiveTotal > 0" class="card-stack">
@@ -318,7 +332,7 @@
           </ng-container>
 
           <ng-container *ngIf="payerRows.length > 1">
-            <div *ngFor="let row of payerRows; let i = index" class="mb-3">
+            <div *ngFor="let row of payerRows; let i = index; trackBy: trackPayerRowByIndex" class="mb-3">
               <app-member-select-grid
                 [label]="'付款人 ' + (i + 1)"
                 [members]="members"

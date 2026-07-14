@@ -473,6 +473,14 @@
   flex-shrink: 0;
 }
 
+/* host 預設 inline 會吃到 baseline 空隙，頭像看起來往上飄 */
+app-member-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+  vertical-align: middle;
+}
+
 .member-avatar {
   --member-avatar-size: 2.25rem;
   position: relative;

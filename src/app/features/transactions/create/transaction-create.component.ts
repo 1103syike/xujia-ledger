@@ -47,7 +47,10 @@ import {
 } from '../../../core/transactions/advance-allocation';
 import { filterManualLineItems } from '../../../core/transactions/advance-display';
 import { distributePayerAmounts } from '../../../core/transactions/payer-distribution';
-import { distributeSplitAmounts } from '../../../core/transactions/split-distribution';
+import {
+  distributeHybridSplitAmounts,
+  distributeSplitAmounts,
+} from '../../../core/transactions/split-distribution';
 import {
   serviceFeeSharesByMember,
   subtractServiceFeeFromAmounts,
@@ -153,7 +156,10 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   effectiveTotal = 0;
   chartBillTotal: number | null = null;
   payingCount = 0;
+  /** 表單輸入框 focus 時隱藏底部提交列，避免鍵盤把畫面擠爆 */
+  isFormFieldFocused = false;
   error = '';
+  private formFocusBlurTimer: ReturnType<typeof setTimeout> | null = null;
   remainderSeed = '';
   repaymentBalance: number | null = null;
   submitDialogOpen = false;
@@ -312,7 +318,48 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   ngOnDestroy(): void {
+    this.clearFormFocusBlurTimer();
     this.subs.forEach((s) => s.unsubscribe());
+  }
+
+  onFormFocusIn(event: FocusEvent): void {
+    if (!this.isEditableFormField(event.target)) return;
+    this.clearFormFocusBlurTimer();
+    this.isFormFieldFocused = true;
+  }
+
+  onFormFocusOut(event: FocusEvent): void {
+    if (!this.isEditableFormField(event.target)) return;
+    this.clearFormFocusBlurTimer();
+    // 等焦點切完再判斷，避免欄位間移動時 bar 閃一下
+    this.formFocusBlurTimer = setTimeout(() => {
+      this.formFocusBlurTimer = null;
+      const active = document.activeElement;
+      const form = document.getElementById('create-advance-form');
+      this.isFormFieldFocused = !!(
+        form &&
+        active &&
+        form.contains(active) &&
+        this.isEditableFormField(active)
+      );
+    }, 0);
+  }
+
+  private isEditableFormField(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return (
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      tag === 'SELECT' ||
+      target.isContentEditable
+    );
+  }
+
+  private clearFormFocusBlurTimer(): void {
+    if (this.formFocusBlurTimer === null) return;
+    clearTimeout(this.formFocusBlurTimer);
+    this.formFocusBlurTimer = null;
   }
 
   canDeactivate(): Observable<boolean> {
@@ -610,6 +657,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   get equalPerPersonLabel(): string | null {
+    if (this.hasAnyLineItems) return null;
     if (!this.preview || this.payingCount === 0) {
       return null;
     }
@@ -625,6 +673,28 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
     const base = Math.min(...amounts);
     return `每人約 NT$ ${base}（含零頭分配）`;
+  }
+
+  /** 有專屬細項時，顯示共同消費剩餘均分 */
+  get sharedRemainderLabel(): string | null {
+    if (!this.hasAnyLineItems || this.payingCount === 0) return null;
+
+    const total = Number(this.advanceForm.value.totalAmount) || 0;
+    if (total <= 0) return null;
+
+    const exclusiveSum = this.sumExclusiveLineItems();
+    const remainder = total - exclusiveSum;
+    if (remainder <= 0) return null;
+
+    const perPerson = Math.floor(remainder / this.payingCount);
+    if (remainder % this.payingCount === 0) {
+      return COPY_SPLIT.sharedRemainderExact(remainder, perPerson);
+    }
+    return COPY_SPLIT.sharedRemainderApprox(remainder, perPerson);
+  }
+
+  get hasAnyLineItems(): boolean {
+    return Object.values(this.memberItems).some((items) => items.length > 0);
   }
 
   get visibleSplitMembers(): DisplayMember[] {
@@ -681,7 +751,12 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   selectAllParticipants(): void {
-    this.applyParticipantMemberIds(this.members.map((m) => m.id));
+    if (this.isAllGroupActive()) {
+      // 已全家再點一次 → 清空（跟單人 chip 可取消一致）
+      this.applyParticipantMemberIds([]);
+    } else {
+      this.applyParticipantMemberIds(this.members.map((m) => m.id));
+    }
     this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
@@ -703,6 +778,22 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   memberHasLineItems(memberId: string): boolean {
     return (this.memberItems[memberId] ?? []).length > 0;
+  }
+
+  /** 該員細項合計（不含共同剩餘） */
+  memberExclusiveTotal(memberId: string): number {
+    return (this.memberItems[memberId] ?? []).reduce(
+      (sum, item) => sum + item.amount,
+      0
+    );
+  }
+
+  /** 該員分到的共同消費（應付 − 專屬細項） */
+  memberCommonShare(memberId: string): number {
+    if (this.isSkipped(memberId) || !this.hasAnyLineItems) return 0;
+    const exclusive = this.memberExclusiveTotal(memberId);
+    const allocated = this.memberBaseSubtotals[memberId] ?? 0;
+    return Math.max(0, allocated - exclusive);
   }
 
   isSplitAmountLocked(memberId: string): boolean {
@@ -992,10 +1083,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.refreshPreview();
   }
 
+  /** 輸入中只改金額，不要換掉 row 物件（否則 *ngFor 會重建 input 導致失焦） */
   setPayerAmount(index: number, value: string): void {
-    const next = [...this.payerRows];
-    next[index] = { ...next[index], amount: value };
-    this.payerRows = next;
+    const row = this.payerRows[index];
+    if (!row) return;
+    row.amount = value;
   }
 
   commitPayerAmount(index: number): void {
@@ -1003,17 +1095,19 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     if (!row) return;
 
     const raw = String(row.amount ?? '').trim();
-    const next = [...this.payerRows];
-
     if (!raw) {
-      next[index] = { ...row, amount: '', locked: false };
+      row.amount = '';
+      row.locked = false;
     } else {
-      const amount = Number(raw) || 0;
-      next[index] = { ...row, amount: String(amount), locked: true };
+      row.amount = String(Number(raw) || 0);
+      row.locked = true;
     }
 
-    this.payerRows = next;
     this.refreshPreview({ syncPayers: true });
+  }
+
+  trackPayerRowByIndex(index: number): number {
+    return index;
   }
 
   onSplitTotalCommit(): void {
@@ -1029,22 +1123,38 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.clearStaleSplitLocksForLineItemMode();
 
-    const rows = participating.map((m) => {
-      const items = this.memberItems[m.id] ?? [];
-      const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
-      const locked = items.length > 0 || this.splitLocked.has(m.id);
-      const amount =
-        items.length > 0 ? fromItems : Number(this.manualAmounts[m.id]) || 0;
-      return { amount, locked };
-    });
-
-    const amounts = distributeSplitAmounts(subtotal, rows);
     const nextManual = { ...this.manualAmounts };
     const nextInputs = { ...this.splitAmountInputs };
 
+    // 有細項：專屬細項歸人，剩餘給所有參與者均分（含已有細項的人）
+    if (this.hasAnyLineItems) {
+      const exclusives = participating.map((m) =>
+        (this.memberItems[m.id] ?? []).reduce((sum, item) => sum + item.amount, 0)
+      );
+      const amounts = distributeHybridSplitAmounts(subtotal, exclusives);
+
+      participating.forEach((m, index) => {
+        nextManual[m.id] = amounts[index];
+        if (!this.memberHasLineItems(m.id)) {
+          nextInputs[m.id] = String(amounts[index]);
+        }
+      });
+
+      this.manualAmounts = nextManual;
+      this.splitAmountInputs = nextInputs;
+      return;
+    }
+
+    const rows = participating.map((m) => ({
+      amount: Number(this.manualAmounts[m.id]) || 0,
+      locked: this.splitLocked.has(m.id),
+    }));
+
+    const amounts = distributeSplitAmounts(subtotal, rows);
+
     participating.forEach((m, index) => {
       nextManual[m.id] = amounts[index];
-      if (!this.splitLocked.has(m.id) && !this.memberHasLineItems(m.id)) {
+      if (!this.splitLocked.has(m.id)) {
         nextInputs[m.id] = String(amounts[index]);
       }
     });
@@ -1323,18 +1433,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private consumptionSubtotal(): number {
+    // 總額以欄位為準（細項／手動分攤不再覆寫）；欄位空時才用分攤合計補
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
-    const hasLineItems = Object.values(this.memberItems).some(
-      (items) => items.length > 0
-    );
-    const hasManualSplits = this.splitLocked.size > 0;
+    if (fromField > 0) return fromField;
 
-    if (hasLineItems || hasManualSplits) {
-      const fromSplits = this.sumBaseParticipatingSplits();
-      return fromSplits > 0 ? fromSplits : fromField;
-    }
-
-    return fromField;
+    return this.sumBaseParticipatingSplits();
   }
 
   get serviceFeeTotal(): number {
@@ -1355,23 +1458,29 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return this.sumBaseParticipatingSplits() + this.serviceFeeAmount();
   }
 
-  /** 逐項記帳或手動分攤時讓消費總額跟合計同步；未填總額時亦帶入分攤合計（不含服務費） */
+  /** 未填消費總額時，用分攤合計帶入（不含服務費）；已填的總額不覆寫 */
   private syncTotalAmountFieldFromSplits(): void {
-    const fromSplits = this.sumBaseParticipatingSplits();
-    const hasLineItems = Object.values(this.memberItems).some(
-      (items) => items.length > 0
-    );
-    const hasManualSplits = this.splitLocked.size > 0;
-
-    if ((hasLineItems || hasManualSplits) && fromSplits > 0) {
-      this.advanceForm.patchValue({ totalAmount: fromSplits }, { emitEvent: false });
-      return;
-    }
-
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
-    if (fromField === 0 && fromSplits > 0) {
+    if (fromField > 0) return;
+
+    const fromSplits = this.sumBaseParticipatingSplits();
+    if (fromSplits > 0) {
       this.advanceForm.patchValue({ totalAmount: fromSplits }, { emitEvent: false });
     }
+  }
+
+  private sumExclusiveLineItems(): number {
+    return this.members
+      .filter((m) => !this.isSkipped(m.id))
+      .reduce(
+        (sum, m) =>
+          sum +
+          (this.memberItems[m.id] ?? []).reduce(
+            (itemSum, item) => itemSum + item.amount,
+            0
+          ),
+        0
+      );
   }
 
   private computeChartBillTotal(): number | null {
@@ -1381,20 +1490,31 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private syncAmountsFromItems(): void {
+    const anchoredTotal = Number(this.advanceForm.value.totalAmount) || 0;
     const baseSubtotals: Record<string, number> = {};
+    const nextManual = { ...this.manualAmounts };
+
     for (const m of this.members) {
+      if (this.isSkipped(m.id)) {
+        baseSubtotals[m.id] = 0;
+        nextManual[m.id] = 0;
+        continue;
+      }
+
       const items = this.memberItems[m.id] ?? [];
       const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
-      const amount = this.isSkipped(m.id)
-        ? 0
-        : items.length > 0
+
+      // 還沒填總額時，細項加總當底稿（由下往上）；有總額則保留 syncSplitAmounts 寫入的專屬＋共同
+      const amount =
+        items.length > 0 && anchoredTotal <= 0
           ? fromItems
-          : this.manualAmounts[m.id] ?? 0;
+          : nextManual[m.id] ?? (items.length > 0 ? fromItems : 0);
+
       baseSubtotals[m.id] = amount;
-      if (!this.isSkipped(m.id)) {
-        this.manualAmounts = { ...this.manualAmounts, [m.id]: amount };
-      }
+      nextManual[m.id] = amount;
     }
+
+    this.manualAmounts = nextManual;
     this.memberBaseSubtotals = baseSubtotals;
     this.applyServiceFeeToMemberSubtotals();
   }
@@ -1589,7 +1709,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.initDrafts();
     this.syncAmountsFromItems();
-    this.refreshPreview();
+    this.refreshPreview({ syncSplits: true });
     this.tryCaptureBaseline();
   }
 
