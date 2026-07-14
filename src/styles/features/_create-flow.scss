@@ -17,8 +17,10 @@
 }
 
 .create-submit-bar--keyboard {
-  transform: translateY(100%);
+  transform: translateY(calc(100% + 24px));
   pointer-events: none;
+  box-shadow: none;
+  opacity: 0;
 }
 
 .create-form-scroll {

@@ -94,6 +94,11 @@ export interface Transaction {
   changeAmount?: number | null;
   /** 還款付款人（repayment only） */
   fromMemberId?: string | null;
+  /**
+   * 還款當下：付款人欠收款人的淨額（正＝尚欠）。
+   * 用來判斷超額還款後卡片要顯示反轉殘額。
+   */
+  repaymentOwedBefore?: number | null;
   participantScope?: ParticipantScope;
   participantIds?: string[];
   splitMode?: SplitMode;

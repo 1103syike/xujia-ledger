@@ -75,4 +75,36 @@ describe('transaction-impact', () => {
       amountText: '',
     });
   });
+
+  it('shows 欠你 for overpay residual to original payer', () => {
+    const tx = {
+      id: 'r1',
+      accountId: 'default',
+      type: 'repayment' as const,
+      title: '還款',
+      totalAmount: 954,
+      payerId: 'lin',
+      fromMemberId: 'zheng',
+      repaymentOwedBefore: 754,
+      status: 'active' as const,
+      createdBy: 'zheng',
+      createdAt: '',
+      updatedAt: '',
+      participants: [
+        { memberId: 'zheng', amount: 954, signedAmount: 200 },
+        { memberId: 'lin', amount: 954, signedAmount: -200 },
+      ],
+    };
+
+    expect(formatViewerImpact(tx, 'zheng')).toEqual({
+      kind: 'receivable',
+      label: '欠你',
+      amountText: '+$200',
+    });
+    expect(formatViewerImpact(tx, 'lin')).toEqual({
+      kind: 'payable',
+      label: '你欠',
+      amountText: '-$200',
+    });
+  });
 });

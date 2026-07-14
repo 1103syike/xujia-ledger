@@ -44,6 +44,7 @@ import {
   compareTransactionsByDate,
   normalizeTransaction,
 } from '../transactions/transaction-date';
+import { amountViewerOwesOther } from '../ledger/ledger-calculator';
 import { AuthService } from './auth.service';
 import { COPY_ERRORS, COPY_RECORD_TYPE } from '../../copy';
 
@@ -327,6 +328,18 @@ export class TransactionService implements OnDestroy {
     const now = new Date().toISOString();
     const fromName = memberName(this.auth, input.fromMemberId);
     const toName = memberName(this.auth, input.toMemberId);
+    const owedBefore = amountViewerOwesOther(
+      this.transactions,
+      input.fromMemberId,
+      input.toMemberId
+    );
+    const excess =
+      owedBefore >= 0 && input.amount > owedBefore
+        ? input.amount - owedBefore
+        : 0;
+    // 超額：participants 存反轉殘額（付款人變債主）；一般還款存現金流
+    const fromSigned = excess > 0 ? excess : -input.amount;
+    const toSigned = excess > 0 ? -excess : input.amount;
 
     const transaction: Transaction = {
       id: seed,
@@ -337,6 +350,7 @@ export class TransactionService implements OnDestroy {
       totalAmount: input.amount,
       payerId: input.toMemberId,
       fromMemberId: input.fromMemberId,
+      repaymentOwedBefore: owedBefore,
       note: input.note?.trim() || null,
       status: 'active',
       createdBy: actor.id,
@@ -346,13 +360,13 @@ export class TransactionService implements OnDestroy {
         {
           memberId: input.fromMemberId,
           amount: input.amount,
-          signedAmount: -input.amount,
+          signedAmount: fromSigned,
           role: 'beneficiary',
         },
         {
           memberId: input.toMemberId,
           amount: input.amount,
-          signedAmount: input.amount,
+          signedAmount: toSigned,
           role: 'payer',
         },
       ],

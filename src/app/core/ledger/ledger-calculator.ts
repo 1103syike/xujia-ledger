@@ -1,5 +1,6 @@
 import { BalanceEdge, SettlementEntry, Transaction } from '../models';
 import { advanceMemberBalances, advanceSettlementEdges, getAdvancePayers } from '../transactions/advance-allocation';
+import { repaymentSignedImpact } from '../transactions/repayment-display';
 
 function edgeKey(from: string, to: string): string {
   return `${from}->${to}`;
@@ -272,10 +273,39 @@ export function oldestPairTransactionDate(
   return dates[0] ?? null;
 }
 
+/**
+ * 補齊舊還款資料缺少的 repaymentOwedBefore（用本筆之前的帳回推當時欠額）
+ */
+export function enrichRepaymentOwedBefore(
+  tx: Transaction,
+  allTransactions?: Transaction[]
+): Transaction {
+  if (tx.type !== 'repayment') return tx;
+  if (tx.repaymentOwedBefore != null) return tx;
+  if (!allTransactions || !tx.fromMemberId) return tx;
+
+  const earlier = allTransactions.filter(
+    (other) =>
+      other.id !== tx.id &&
+      (other.createdAt < tx.createdAt ||
+        (other.createdAt === tx.createdAt && other.id < tx.id))
+  );
+
+  return {
+    ...tx,
+    repaymentOwedBefore: amountViewerOwesOther(
+      earlier,
+      tx.fromMemberId,
+      tx.payerId
+    ),
+  };
+}
+
 /** 交易對 memberId 的 signed 影響（正=應收回，負=應付） */
 export function signedImpactOnMember(
   tx: Transaction,
-  memberId: string
+  memberId: string,
+  allTransactions?: Transaction[]
 ): number {
   if (!isBalanceRelevant(tx)) return 0;
 
@@ -292,10 +322,10 @@ export function signedImpactOnMember(
   }
 
   if (tx.type === 'repayment') {
-    const from = tx.fromMemberId ?? '';
-    if (from === memberId) return -tx.totalAmount;
-    if (tx.payerId === memberId) return tx.totalAmount;
-    return 0;
+    return repaymentSignedImpact(
+      enrichRepaymentOwedBefore(tx, allTransactions),
+      memberId
+    );
   }
 
   if (tx.type === 'advance') {

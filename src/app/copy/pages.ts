@@ -42,6 +42,8 @@ export const COPY_PAGES = {
   netOwe: '目前淨欠',
   netReceive: '目前淨收',
   ledgerClear: '帳本已清',
+  /** 完全沒有往來欠款時的 hero 文案 */
+  ledgerNoDebt: '恭喜你沒有債務纏身',
   totalYouOwe: '你欠',
   totalOwedYou: '欠你',
   settlementsWith: '跟誰有帳',

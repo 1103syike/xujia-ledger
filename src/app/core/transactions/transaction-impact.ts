@@ -51,9 +51,12 @@ export function isViewerInvolvedInTransaction(
 /** 列表卡片右上角：這筆記錄對目前使用者的帳務影響 */
 export function formatViewerImpact(
   tx: Transaction,
-  memberId: string
+  memberId: string,
+  allTransactions?: Transaction[]
 ): ViewerImpactDisplay {
-  const impact = memberId ? signedImpactOnMember(tx, memberId) : 0;
+  const impact = memberId
+    ? signedImpactOnMember(tx, memberId, allTransactions)
+    : 0;
 
   if (tx.type === 'transfer') {
     return {

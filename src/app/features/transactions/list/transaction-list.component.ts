@@ -11,6 +11,8 @@ import {
 import { isConsolidatable } from '../../../core/consolidation/debt-consolidation';
 import { memberNetRowsForTransaction } from '../../../core/transactions/transaction-member-nets';
 import { getAdvancePayers } from '../../../core/transactions/advance-allocation';
+import { repaymentCreditorIds } from '../../../core/transactions/repayment-display';
+import { enrichRepaymentOwedBefore } from '../../../core/ledger/ledger-calculator';
 import { activeTransactions, transactionTypeLabel } from '../../../core/transactions/transaction-date';
 import {
   formatTransactionListTime,
@@ -119,17 +121,22 @@ export class TransactionListComponent implements OnInit {
 
       const nameOf = (id: string) => this.auth.getMember(id)?.name ?? id;
       let entries: ListEntry[] = filtered.map((tx) => {
-        const impact = viewerId ? signedImpactOnMember(tx, viewerId) : 0;
+        const impact = viewerId
+          ? signedImpactOnMember(tx, viewerId, active)
+          : 0;
+        const memberNets = memberNetRowsForTransaction(tx, active);
         return {
           tx,
           impact,
-          impactDisplay: formatViewerImpact(tx, viewerId),
+          impactDisplay: formatViewerImpact(tx, viewerId, active),
           consolidatable: isConsolidatable(tx),
-          memberNets: memberNetRowsForTransaction(tx),
+          memberNets,
           payerIds:
             tx.type === 'advance'
               ? getAdvancePayers(tx).map((p) => p.memberId)
-              : [],
+              : tx.type === 'repayment'
+                ? repaymentCreditorIds(enrichRepaymentOwedBefore(tx, active))
+                : [],
           storyLine: formatTransactionStoryLine(tx, nameOf),
           listTime: formatTransactionListTime(tx),
           listDate: formatTransactionPickDate(tx),

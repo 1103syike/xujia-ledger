@@ -4,6 +4,8 @@ import {
   advanceMemberBalances,
   memberNetDisplayAmount,
 } from '../transactions/advance-allocation';
+import { enrichRepaymentOwedBefore } from '../ledger/ledger-calculator';
+import { repaymentMemberNetRows } from './repayment-display';
 
 export interface MemberNetRow {
   memberId: string;
@@ -13,8 +15,14 @@ export interface MemberNetRow {
   displayNet?: number;
 }
 
-/** 交易卡片下方：每人應收（正）／應付（負） */
-export function memberNetRowsForTransaction(tx: Transaction): MemberNetRow[] {
+/**
+ * 交易卡片下方：每人應收（正）／應付（負）
+ * @param allTransactions 可選，還款超額時用來回推當時欠額（舊資料沒存 repaymentOwedBefore）
+ */
+export function memberNetRowsForTransaction(
+  tx: Transaction,
+  allTransactions?: Transaction[]
+): MemberNetRow[] {
   if (tx.type === 'transfer') {
     const fromParticipants = tx.participants
       .map((p) => ({
@@ -53,12 +61,9 @@ export function memberNetRowsForTransaction(tx: Transaction): MemberNetRow[] {
   }
 
   if (tx.type === 'repayment') {
-    const from = tx.fromMemberId;
-    if (!from) return [];
-    return sortMemberNets([
-      { memberId: from, net: -tx.totalAmount },
-      { memberId: tx.payerId, net: tx.totalAmount },
-    ]);
+    return sortMemberNets(
+      repaymentMemberNetRows(enrichRepaymentOwedBefore(tx, allTransactions))
+    );
   }
 
   return [];

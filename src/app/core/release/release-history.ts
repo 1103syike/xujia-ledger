@@ -19,7 +19,7 @@ export type ReleaseEntry = {
  * - ZZ = 小版本
  * 大版本寫成 XX.YY（兩段），不附敘述。
  */
-export const CURRENT_APP_VERSION = '16.3.4';
+export const CURRENT_APP_VERSION = '16.3.5';
 
 /** 此日期起顯示含時分的發佈時間 */
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
@@ -124,6 +124,38 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     title: '修正鍵盤開啟時提交列仍顯示',
     highlights: [
       '改用基準高度偵測鍵盤，並確保畫面會跟著刷新',
+    ],
+  },
+  {
+    version: '16.3.5',
+    releasedAt: '2026-07-14T16:28:00+08:00',
+    title: '還款超額顯示與首頁帳務整理',
+    highlights: [
+      '多還款後卡片顯示反轉殘額，債主／丐幫對齊',
+      '首頁沒欠或沒被欠的區塊自動隱藏，全無帳顯示恭喜文案',
+    ],
+    sections: [
+      {
+        heading: '還款',
+        items: [
+          '超額還款後只顯示反轉殘額（例如多還 200 → 你 +200、對方 −200）',
+          '金主／丐幫 badge 依反轉後方向顯示',
+        ],
+      },
+      {
+        heading: '首頁',
+        items: [
+          '沒欠人錢或沒人欠你的 pill 不顯示，單邊佔滿',
+          '完全無債務時改為「恭喜你沒有債務纏身」',
+        ],
+      },
+      {
+        heading: '介面細節',
+        items: [
+          '記帳 FAB 去掉會冒矩形光暈的 blur 陰影',
+          '鍵盤開啟時提交列完全隱藏，不殘留陰影',
+        ],
+      },
     ],
   },
   {

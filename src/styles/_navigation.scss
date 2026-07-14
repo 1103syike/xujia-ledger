@@ -142,6 +142,7 @@
   height: 3.25rem;
   padding: 0 var(--space-4) 0 var(--space-2);
   overflow: hidden;
+  isolation: isolate;
   border-radius: var(--radius-full);
   border: 1.5px solid color-mix(in srgb, var(--ds-white) 42%, transparent);
   background: linear-gradient(
@@ -151,28 +152,13 @@
   );
   color: var(--color-btn-primary-text);
   text-decoration: none;
+  /* 只用 box-shadow；避免 blur 偽元素在 Safari 出現矩形光暈 */
   box-shadow:
-    0 12px 28px color-mix(in srgb, var(--theme-coral) 38%, transparent),
-    0 4px 10px color-mix(in srgb, var(--theme-ink) 10%, transparent),
+    0 10px 22px color-mix(in srgb, var(--theme-coral) 32%, transparent),
+    0 3px 8px color-mix(in srgb, var(--theme-ink) 10%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--ds-white) 35%, transparent);
   --motion-press-scale: 0.94;
   animation: record-fab-enter 0.45s var(--motion-ease-spring) both;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    z-index: -1;
-    border-radius: inherit;
-    background: linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--theme-coral) 55%, transparent),
-      color-mix(in srgb, var(--theme-peach) 35%, transparent)
-    );
-    filter: blur(10px);
-    opacity: 0.55;
-    pointer-events: none;
-  }
 
   &::after {
     content: '';
@@ -189,8 +175,8 @@
 
   &:active {
     box-shadow:
-      0 6px 16px color-mix(in srgb, var(--theme-coral) 30%, transparent),
-      0 2px 6px color-mix(in srgb, var(--theme-ink) 8%, transparent),
+      0 5px 14px color-mix(in srgb, var(--theme-coral) 28%, transparent),
+      0 2px 5px color-mix(in srgb, var(--theme-ink) 8%, transparent),
       inset 0 1px 0 color-mix(in srgb, var(--ds-white) 25%, transparent);
   }
 }

@@ -16,7 +16,7 @@
 
     <ng-container *ngIf="vm.hero.isClear; else heroBalances">
       <app-kaomoji-deco mood="celebrate" [salt]="clearSalt" seed="clear" />
-      <p class="dashboard-hero__amount text-ink">{{ pages.ledgerClear }}</p>
+      <p class="dashboard-hero__amount text-ink">{{ pages.ledgerNoDebt }}</p>
       <p class="helper-text">{{ clearQuipLine(vm.memberId) }}</p>
       <button
         type="button"
@@ -54,11 +54,16 @@
         </p>
       </div>
 
-      <div class="dashboard-hero__pills">
+      <div
+        class="dashboard-hero__pills"
+        [class.dashboard-hero__pills--single]="
+          (vm.oweSettlements.length > 0) !== (vm.owedSettlements.length > 0)
+        "
+      >
         <button
+          *ngIf="vm.oweSettlements.length > 0"
           type="button"
           class="dashboard-hero__pill dashboard-hero__pill--owe"
-          [disabled]="vm.oweSettlements.length === 0"
           (click)="
             onHeroSettlementTap(
               'owe',
@@ -69,7 +74,7 @@
           "
         >
           <span class="dashboard-hero__pill-label">{{ pages.totalYouOwe }}</span>
-          <div *ngIf="vm.oweSettlements.length" class="dashboard-hero__pill-avatars">
+          <div class="dashboard-hero__pill-avatars">
             <span
               *ngFor="let s of vm.oweSettlements"
               class="dashboard-hero__pill-avatar"
@@ -87,9 +92,9 @@
           }}</span>
         </button>
         <button
+          *ngIf="vm.owedSettlements.length > 0"
           type="button"
           class="dashboard-hero__pill dashboard-hero__pill--owed"
-          [disabled]="vm.owedSettlements.length === 0"
           (click)="
             onHeroSettlementTap(
               'owed',
@@ -100,7 +105,7 @@
           "
         >
           <span class="dashboard-hero__pill-label">{{ pages.totalOwedYou }}</span>
-          <div *ngIf="vm.owedSettlements.length" class="dashboard-hero__pill-avatars">
+          <div class="dashboard-hero__pill-avatars">
             <span
               *ngFor="let s of vm.owedSettlements"
               class="dashboard-hero__pill-avatar"
@@ -170,7 +175,7 @@
           </div>
           <div
             class="dashboard-list-cell__impact"
-            *ngIf="formatViewerImpact(entry.tx, vm.memberId) as impact"
+            *ngIf="formatViewerImpact(entry.tx, vm.memberId, vm.activeTransactions) as impact"
           >
             <span
               class="dashboard-list-cell__impact-label"

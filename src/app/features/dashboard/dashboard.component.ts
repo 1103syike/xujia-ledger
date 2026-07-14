@@ -131,7 +131,7 @@ export class DashboardComponent implements OnInit {
 
       const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => ({
         tx,
-        impact: memberId ? signedImpactOnMember(tx, memberId) : 0,
+        impact: memberId ? signedImpactOnMember(tx, memberId, active) : 0,
       }));
 
       return {

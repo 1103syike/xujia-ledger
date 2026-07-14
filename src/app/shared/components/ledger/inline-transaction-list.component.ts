@@ -85,7 +85,7 @@ export class InlineTransactionListComponent implements OnChanges {
       impact: this.viewerId
         ? this.counterpartyId
           ? signedImpactOnPair(tx, this.viewerId, this.counterpartyId)
-          : signedImpactOnMember(tx, this.viewerId)
+          : signedImpactOnMember(tx, this.viewerId, this.transactions)
         : 0,
       splitParticipants:
         tx.type === 'advance'
