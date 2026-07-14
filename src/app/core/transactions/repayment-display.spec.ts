@@ -50,9 +50,9 @@ describe('repayment-display', () => {
     expect(repaymentCreditorIds(tx)).toEqual(['zheng']);
   });
 
-  it('formats overpay title as 超額還款（欠款/還款）', () => {
+  it('formats overpay title as 超額還款（還款/欠款,+超額）', () => {
     const tx = repayment({ repaymentOwedBefore: 754 });
-    expect(formatRepaymentTitle(tx)).toBe('超額還款（754/954）');
+    expect(formatRepaymentTitle(tx)).toBe('超額還款（954/754,+200）');
   });
 
   it('formats normal repayment title as 還款', () => {
