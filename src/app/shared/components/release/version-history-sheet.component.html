@@ -59,7 +59,7 @@
               <span class="version-history-sheet__version">v{{ release.version }}</span>
               <time class="version-history-sheet__date">{{ formatReleaseDate(release) }}</time>
             </div>
-            <h4 class="version-history-sheet__title">{{ release.title }}</h4>
+            <h4 *ngIf="release.title" class="version-history-sheet__title">{{ release.title }}</h4>
 
             <ul *ngIf="release.highlights.length" class="version-history-sheet__bullets">
               <li *ngFor="let item of release.highlights">{{ item }}</li>

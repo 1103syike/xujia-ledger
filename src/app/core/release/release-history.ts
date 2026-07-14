@@ -6,13 +6,20 @@ export type ReleaseSection = {
 export type ReleaseEntry = {
   version: string;
   releasedAt: string;
+  /** 大版本（如 16.3）可留空 */
   title: string;
   highlights: string[];
   sections?: ReleaseSection[];
 };
 
-/** 目前 App 版本 */
-export const CURRENT_APP_VERSION = '3.2.0';
+/**
+ * 版本號：XX.YY.ZZ
+ * - XX = Angular 主版本（目前 16）
+ * - YY = App 大版本
+ * - ZZ = 小版本
+ * 大版本寫成 XX.YY（兩段），不附敘述。
+ */
+export const CURRENT_APP_VERSION = '16.3.2';
 
 /** 此日期起顯示含時分的發佈時間 */
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
@@ -23,7 +30,7 @@ const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
  */
 export const RELEASE_HISTORY: ReleaseEntry[] = [
   {
-    version: '3.2.0',
+    version: '16.3.2',
     releasedAt: '2026-07-14T14:57:00+08:00',
     title: '記帳分攤更聰明、手機輸入更順',
     highlights: [
@@ -54,7 +61,7 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '3.1.0',
+    version: '16.3.1',
     releasedAt: '2026-06-24T17:29:03+08:00',
     title: '強化動效體驗、導覽轉場與帳本 UI 還原補齊',
     highlights: [],
@@ -97,16 +104,13 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '3.0.0',
+    version: '16.3',
     releasedAt: '2026-06-23T17:29:53+08:00',
-    title: 'core 目錄分層與設計系統',
-    highlights: [
-      'utils 拆為 ledger／display／infra／consolidation',
-      'design tokens、SCSS 模組化、元件目錄整理',
-    ],
+    title: '',
+    highlights: [],
   },
   {
-    version: '2.2.0',
+    version: '16.2.2',
     releasedAt: '2026-06-23T16:43:33+08:00',
     title: '架構重整與文案集中管理',
     highlights: [
@@ -116,7 +120,7 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '2.1.0',
+    version: '16.2.1',
     releasedAt: '2026-06-23T13:51:25+08:00',
     title: '墊付分攤、整合欠款與利息結算',
     highlights: [
@@ -126,17 +130,13 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '2.0.0',
+    version: '16.2',
     releasedAt: '2026-06-23T09:47:43+08:00',
-    title: '交易模型重構與帳本服務升級',
-    highlights: [
-      'expense 遷移為 transaction 服務與 ledger 計算',
-      '自訂頭像上傳、成員帳本頁、登入偏好',
-      '分享預覽圖與 og 標籤微調',
-    ],
+    title: '',
+    highlights: [],
   },
   {
-    version: '1.4.0',
+    version: '16.1.4',
     releasedAt: '2026-06-22T15:29:35+08:00',
     title: '代表色、分享預覽與記帳體驗',
     highlights: [
@@ -146,7 +146,7 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '1.3.0',
+    version: '16.1.3',
     releasedAt: '2026-06-22T14:19:18+08:00',
     title: '品牌視覺與日期顯示強化',
     highlights: [
@@ -155,7 +155,7 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '1.2.0',
+    version: '16.1.2',
     releasedAt: '2026-06-22T13:19:45+08:00',
     title: '正式版核心功能補齊',
     highlights: [
@@ -165,22 +165,19 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     ],
   },
   {
-    version: '1.1.0',
+    version: '16.1.1',
     releasedAt: '2026-06-22T11:19:06+08:00',
     title: '成員系統與個人化設定初版',
     highlights: [
       '成員 profile、主題色、頭像與登入流程',
-      '設定頁、member picker、Firestore 規則調整',
+      '設定頁、member picker、firestore 規則調整',
     ],
   },
   {
-    version: '1.0.0',
+    version: '16.1',
     releasedAt: '2026-06-22T09:21:26+08:00',
-    title: '許家帳本初版上線',
-    highlights: [
-      'Angular、Firestore、PWA 與 Tailwind 基礎設定',
-      '分帳記帳初版 UI 與 expense 服務骨架',
-    ],
+    title: '',
+    highlights: [],
   },
 ];
 
@@ -206,16 +203,19 @@ export function formatReleaseDate(entry: ReleaseEntry): string {
   });
 }
 
-export function isMajorBump(prev: string, next: string): boolean {
-  const [pMaj] = prev.split('.').map(Number);
-  const [nMaj] = next.split('.').map(Number);
-  return nMaj > pMaj;
+/** 取 XX.YY（大版本線） */
+export function versionLine(version: string): string {
+  const parts = version.split('.');
+  return `${parts[0]}.${parts[1] ?? 0}`;
 }
 
-/** 語意化大版本（x.0.0），含初版 1.0.0 */
+export function isMajorBump(prev: string, next: string): boolean {
+  return versionLine(prev) !== versionLine(next);
+}
+
+/** 大版本：兩段式（如 16.3），無小版號 */
 export function isMajorRelease(version: string): boolean {
-  const [major, minor, patch] = version.split('.').map(Number);
-  return minor === 0 && patch === 0;
+  return version.split('.').length === 2;
 }
 
 export function isHighlightedRelease(
