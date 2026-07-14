@@ -5,6 +5,7 @@ import { combineLatest, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TransactionService } from '../../core/services/transaction.service';
 import {
+  enrichRepaymentOwedBefore,
   settlementsForMember,
   signedImpactOnMember,
 } from '../../core/ledger/ledger-calculator';
@@ -24,6 +25,7 @@ import {
 import { activeTransactions } from '../../core/transactions/transaction-date';
 import { formatAdvancePayerNames } from '../../core/transactions/advance-display';
 import { formatViewerImpact } from '../../core/transactions/transaction-impact';
+import { formatRepaymentTitle } from '../../core/transactions/repayment-display';
 import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
 import { TransactionDatePipe } from '../../shared/pipes/transaction-date.pipe';
 import { KaomojiDecoComponent } from '../../shared/components/branding/kaomoji-deco.component';
@@ -46,6 +48,7 @@ import { sheetOverlay, sheetPanel } from '../../animations/route.animations';
 
 interface LatestEntry {
   tx: Transaction;
+  displayTitle: string;
   impact: number;
 }
 
@@ -131,6 +134,10 @@ export class DashboardComponent implements OnInit {
 
       const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => ({
         tx,
+        displayTitle:
+          tx.type === 'repayment'
+            ? formatRepaymentTitle(enrichRepaymentOwedBefore(tx, active))
+            : tx.title,
         impact: memberId ? signedImpactOnMember(tx, memberId, active) : 0,
       }));
 

@@ -9,7 +9,7 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
-              <h2 class="section-title">{{ tx.title }}</h2>
+              <h2 class="section-title">{{ displayTitle(tx, vm.activeList) }}</h2>
               <span class="chip bg-cream">{{ typeLabel(tx.type) }}</span>
               <span *ngIf="tx.settledByTransferId" class="chip bg-lavender/40 text-xs">{{ terms.consolidated }}</span>
             </div>

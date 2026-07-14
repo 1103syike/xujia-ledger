@@ -345,7 +345,7 @@ export class TransactionService implements OnDestroy {
       id: seed,
       accountId: DEFAULT_ACCOUNT_ID,
       type: 'repayment',
-      title: '還款',
+      title: excess > 0 ? '超額還款' : '還款',
       date: input.date,
       totalAmount: input.amount,
       payerId: input.toMemberId,

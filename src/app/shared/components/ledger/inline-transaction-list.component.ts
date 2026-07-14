@@ -11,9 +11,10 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Transaction } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
-import { signedImpactOnMember, signedImpactOnPair } from '../../../core/ledger/ledger-calculator';
+import { signedImpactOnMember, signedImpactOnPair, enrichRepaymentOwedBefore } from '../../../core/ledger/ledger-calculator';
 import { transactionTypeLabel } from '../../../core/transactions/transaction-date';
 import { formatAdvancePayerNames } from '../../../core/transactions/advance-display';
+import { formatRepaymentTitle } from '../../../core/transactions/repayment-display';
 import {
   formatOweAmount,
   formatOwedAmount,
@@ -28,6 +29,7 @@ import { COPY_EMPTY, COPY_SPLIT, COPY_TERMS } from '../../../copy';
 
 export interface InlineTransactionEntry {
   tx: Transaction;
+  displayTitle: string;
   impact: number;
   splitParticipants: { memberId: string; amount: number }[];
 }
@@ -82,6 +84,12 @@ export class InlineTransactionListComponent implements OnChanges {
   private rebuildEntries(): void {
     this.entries = this.transactions.map((tx) => ({
       tx,
+      displayTitle:
+        tx.type === 'repayment'
+          ? formatRepaymentTitle(
+              enrichRepaymentOwedBefore(tx, this.transactions)
+            )
+          : tx.title,
       impact: this.viewerId
         ? this.counterpartyId
           ? signedImpactOnPair(tx, this.viewerId, this.counterpartyId)

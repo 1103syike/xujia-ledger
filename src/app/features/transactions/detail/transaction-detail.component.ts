@@ -14,7 +14,10 @@ import { participantLineItemsWithChange } from '../../../core/transactions/advan
 import { formatTransactionStoryLine } from '../../../core/transactions/transaction-summary';
 import { getAdvancePayers, memberNetDisplayAmount, advanceChangeShareByMember } from '../../../core/transactions/advance-allocation';
 import { memberNetRowsForTransaction } from '../../../core/transactions/transaction-member-nets';
+import { formatRepaymentTitle } from '../../../core/transactions/repayment-display';
+import { enrichRepaymentOwedBefore } from '../../../core/ledger/ledger-calculator';
 import { LineItem, Transaction, TransactionParticipant, TransferEdge } from '../../../core/models';
+import { activeTransactions } from '../../../core/transactions/transaction-date';
 import { InterestEstimateComponent } from '../../../shared/components/ledger/interest-estimate.component';
 import { ViewSwitchComponent } from '../../../shared/components/form/view-switch.component';
 import { TransferBreakdownComponent } from '../../../shared/components/ledger/transfer-breakdown.component';
@@ -35,6 +38,7 @@ interface TransferMemberRow {
 
 interface TransactionDetailVm {
   tx: Transaction | undefined;
+  activeList: Transaction[];
   transferEdges: TransferEdge[];
   transferMemberRows: TransferMemberRow[];
   sourceTransactions: Transaction[];
@@ -97,9 +101,11 @@ export class TransactionDetailComponent {
 
   private buildVm(list: Transaction[], id: string | null): TransactionDetailVm {
     const tx = id ? list.find((t) => t.id === id) : undefined;
+    const activeList = activeTransactions(list);
     if (!tx || tx.type !== 'transfer') {
       return {
         tx,
+        activeList,
         transferEdges: [],
         transferMemberRows: [],
         sourceTransactions: [],
@@ -113,10 +119,16 @@ export class TransactionDetailComponent {
 
     return {
       tx,
+      activeList,
       transferEdges: breakdown.edges,
       transferMemberRows: breakdown.memberRows,
       sourceTransactions,
     };
+  }
+
+  displayTitle(tx: Transaction, activeList: Transaction[]): string {
+    if (tx.type !== 'repayment') return tx.title;
+    return formatRepaymentTitle(enrichRepaymentOwedBefore(tx, activeList));
   }
 
   owingParticipants(tx: Transaction): TransactionParticipant[] {

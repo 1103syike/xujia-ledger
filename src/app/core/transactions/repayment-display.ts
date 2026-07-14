@@ -1,10 +1,30 @@
 import { Transaction } from '../models';
+import { COPY_RECORD_TYPE } from '../../copy';
 
 export type RepaymentNetRow = {
   memberId: string;
   /** 正＝應收（債主），負＝應付（丐幫） */
   net: number;
 };
+
+/** 還款金額是否超過當下欠額 */
+export function isRepaymentOverpay(tx: Transaction): boolean {
+  if (tx.type !== 'repayment') return false;
+  const owedBefore = tx.repaymentOwedBefore;
+  return (
+    owedBefore != null && owedBefore >= 0 && tx.totalAmount > owedBefore
+  );
+}
+
+/** 列表／明細標題：超額還款（欠款/還款） */
+export function formatRepaymentTitle(tx: Transaction): string {
+  if (tx.type !== 'repayment') return tx.title;
+  if (!isRepaymentOverpay(tx)) {
+    return tx.title || COPY_RECORD_TYPE.repayment;
+  }
+  const owed = tx.repaymentOwedBefore ?? 0;
+  return `${COPY_RECORD_TYPE.repaymentOverpay}（${owed}/${tx.totalAmount}）`;
+}
 
 /**
  * 還款卡片每人淨額：
@@ -20,7 +40,7 @@ export function repaymentMemberNetRows(tx: Transaction): RepaymentNetRow[] {
   const amount = tx.totalAmount;
   const owedBefore = tx.repaymentOwedBefore;
 
-  if (owedBefore != null && owedBefore >= 0 && amount > owedBefore) {
+  if (isRepaymentOverpay(tx) && owedBefore != null) {
     const excess = amount - owedBefore;
     return sortByNet([
       { memberId: from, net: excess },

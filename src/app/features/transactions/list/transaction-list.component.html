@@ -73,7 +73,7 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <app-consolidate-pick-row
-                      [title]="entry.tx.title"
+                      [title]="entry.displayTitle"
                       [impactDisplay]="entry.impactDisplay"
                       [listDate]="entry.listDate"
                       [participantLine]="entry.participantLine"
@@ -121,7 +121,7 @@
     <ng-template #summaryContent let-entry>
       <div class="tx-card__head">
         <div class="tx-card__head-main min-w-0">
-          <p class="item-title">{{ entry.tx.title }}</p>
+          <p class="item-title">{{ entry.displayTitle }}</p>
           <p *ngIf="entry.storyLine" class="tx-card__subtitle">{{ entry.storyLine }}</p>
         </div>
         <time class="tx-card__datetime">{{ entry.listTime }}</time>

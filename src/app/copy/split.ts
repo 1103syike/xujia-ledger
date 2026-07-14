@@ -18,6 +18,7 @@ export const COPY_SPLIT = {
 export const COPY_RECORD_TYPE = {
   splitBill: '分帳',
   repayment: '還款',
+  repaymentOverpay: '超額還款',
   consolidate: '整合欠款',
   adjustment: '調整',
 } as const;

@@ -1,4 +1,5 @@
 import {
+  formatRepaymentTitle,
   repaymentCreditorIds,
   repaymentMemberNetRows,
 } from './repayment-display';
@@ -47,5 +48,15 @@ describe('repayment-display', () => {
     expect(byId.get('zheng')).toBe(200);
     expect(byId.get('lin')).toBe(-200);
     expect(repaymentCreditorIds(tx)).toEqual(['zheng']);
+  });
+
+  it('formats overpay title as 超額還款（欠款/還款）', () => {
+    const tx = repayment({ repaymentOwedBefore: 754 });
+    expect(formatRepaymentTitle(tx)).toBe('超額還款（754/954）');
+  });
+
+  it('formats normal repayment title as 還款', () => {
+    const tx = repayment({ repaymentOwedBefore: 954 });
+    expect(formatRepaymentTitle(tx)).toBe('還款');
   });
 });

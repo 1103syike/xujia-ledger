@@ -19,7 +19,7 @@ export type ReleaseEntry = {
  * - ZZ = 小版本
  * 大版本寫成 XX.YY（兩段），不附敘述。
  */
-export const CURRENT_APP_VERSION = '16.3.5';
+export const CURRENT_APP_VERSION = '16.3.6';
 
 /** 此日期起顯示含時分的發佈時間 */
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
@@ -156,6 +156,14 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
           '鍵盤開啟時提交列完全隱藏，不殘留陰影',
         ],
       },
+    ],
+  },
+  {
+    version: '16.3.6',
+    releasedAt: '2026-07-14T16:39:00+08:00',
+    title: '超額還款標題標明欠款與還款金額',
+    highlights: [
+      '超額還款顯示為「超額還款（欠款/還款）」',
     ],
   },
   {

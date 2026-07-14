@@ -11,7 +11,10 @@ import {
 import { isConsolidatable } from '../../../core/consolidation/debt-consolidation';
 import { memberNetRowsForTransaction } from '../../../core/transactions/transaction-member-nets';
 import { getAdvancePayers } from '../../../core/transactions/advance-allocation';
-import { repaymentCreditorIds } from '../../../core/transactions/repayment-display';
+import {
+  formatRepaymentTitle,
+  repaymentCreditorIds,
+} from '../../../core/transactions/repayment-display';
 import { enrichRepaymentOwedBefore } from '../../../core/ledger/ledger-calculator';
 import { activeTransactions, transactionTypeLabel } from '../../../core/transactions/transaction-date';
 import {
@@ -44,6 +47,7 @@ import { prefetchTransactionCreateRoute } from '../../../core/routing/lazy-route
 
 interface ListEntry {
   tx: Transaction;
+  displayTitle: string;
   impact: number;
   impactDisplay: ViewerImpactDisplay;
   consolidatable: boolean;
@@ -124,9 +128,15 @@ export class TransactionListComponent implements OnInit {
         const impact = viewerId
           ? signedImpactOnMember(tx, viewerId, active)
           : 0;
+        const enriched =
+          tx.type === 'repayment' ? enrichRepaymentOwedBefore(tx, active) : tx;
         const memberNets = memberNetRowsForTransaction(tx, active);
         return {
           tx,
+          displayTitle:
+            tx.type === 'repayment'
+              ? formatRepaymentTitle(enriched)
+              : tx.title,
           impact,
           impactDisplay: formatViewerImpact(tx, viewerId, active),
           consolidatable: isConsolidatable(tx),
@@ -135,7 +145,7 @@ export class TransactionListComponent implements OnInit {
             tx.type === 'advance'
               ? getAdvancePayers(tx).map((p) => p.memberId)
               : tx.type === 'repayment'
-                ? repaymentCreditorIds(enrichRepaymentOwedBefore(tx, active))
+                ? repaymentCreditorIds(enriched)
                 : [],
           storyLine: formatTransactionStoryLine(tx, nameOf),
           listTime: formatTransactionListTime(tx),
