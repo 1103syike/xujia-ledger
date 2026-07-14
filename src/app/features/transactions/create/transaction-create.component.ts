@@ -51,6 +51,7 @@ import {
   distributeHybridSplitAmounts,
   distributeSplitAmounts,
 } from '../../../core/transactions/split-distribution';
+import { VirtualKeyboardMonitor } from '../../../core/infra/virtual-keyboard';
 import {
   serviceFeeSharesByMember,
   subtractServiceFeeFromAmounts,
@@ -156,10 +157,12 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   effectiveTotal = 0;
   chartBillTotal: number | null = null;
   payingCount = 0;
-  /** 表單輸入框 focus 時隱藏底部提交列，避免鍵盤把畫面擠爆 */
-  isFormFieldFocused = false;
+  /** 虛擬鍵盤開啟時隱藏底部提交列（由 visualViewport 判斷，不靠 focus 猜測） */
+  isKeyboardOpen = false;
   error = '';
   private formFocusBlurTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly keyboardMonitor = new VirtualKeyboardMonitor();
+  private formFieldFocused = false;
   remainderSeed = '';
   repaymentBalance: number | null = null;
   submitDialogOpen = false;
@@ -319,30 +322,42 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnDestroy(): void {
     this.clearFormFocusBlurTimer();
+    this.keyboardMonitor.stop();
     this.subs.forEach((s) => s.unsubscribe());
   }
 
   onFormFocusIn(event: FocusEvent): void {
     if (!this.isEditableFormField(event.target)) return;
     this.clearFormFocusBlurTimer();
-    this.isFormFieldFocused = true;
+    this.formFieldFocused = true;
+    this.keyboardMonitor.start((open) => {
+      this.isKeyboardOpen = open;
+      // 鍵盤已關且不再編輯 → 解除監聽
+      if (!open && !this.formFieldFocused) {
+        this.keyboardMonitor.stop();
+      }
+    });
   }
 
   onFormFocusOut(event: FocusEvent): void {
     if (!this.isEditableFormField(event.target)) return;
     this.clearFormFocusBlurTimer();
-    // 等焦點切完再判斷，避免欄位間移動時 bar 閃一下
+    // 等焦點切完再判斷，避免欄位間移動時 monitor 被關掉
     this.formFocusBlurTimer = setTimeout(() => {
       this.formFocusBlurTimer = null;
       const active = document.activeElement;
       const form = document.getElementById('create-advance-form');
-      this.isFormFieldFocused = !!(
+      this.formFieldFocused = !!(
         form &&
         active &&
         form.contains(active) &&
         this.isEditableFormField(active)
       );
-    }, 0);
+      if (!this.formFieldFocused && !this.keyboardMonitor.isOpen) {
+        this.keyboardMonitor.stop();
+        this.isKeyboardOpen = false;
+      }
+    }, 50);
   }
 
   private isEditableFormField(target: EventTarget | null): boolean {

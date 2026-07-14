@@ -20,7 +20,7 @@
       <div
         *ngIf="mode === 'advance'"
         class="create-submit-bar"
-        [class.create-submit-bar--keyboard]="isFormFieldFocused"
+        [class.create-submit-bar--keyboard]="isKeyboardOpen"
       >
         <div class="create-submit-bar__inner">
           <div *ngIf="effectiveTotal > 0 || payerTotal > 0" class="advance-sticky-summary">
