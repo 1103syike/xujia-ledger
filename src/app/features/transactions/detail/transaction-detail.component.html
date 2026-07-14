@@ -15,7 +15,7 @@
             </div>
             <p class="helper-text mt-1">
               {{ tx | transactionDate }}
-              <span *ngIf="storyLine(tx)"> · {{ storyLine(tx) }}</span>
+              <span *ngIf="storyLine(tx, vm.activeList)"> · {{ storyLine(tx, vm.activeList) }}</span>
               <span *ngIf="tx.serviceFee"> · 服務費 NT$ {{ tx.serviceFee }}</span>
             </p>
           </div>

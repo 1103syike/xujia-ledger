@@ -23,7 +23,7 @@ import {
   totalDebtRanking,
 } from '../../core/display/dashboard-insights';
 import { activeTransactions } from '../../core/transactions/transaction-date';
-import { formatAdvancePayerNames } from '../../core/transactions/advance-display';
+import { formatTransactionStoryLine } from '../../core/transactions/transaction-summary';
 import { formatViewerImpact } from '../../core/transactions/transaction-impact';
 import { formatRepaymentTitle } from '../../core/transactions/repayment-display';
 import { MemberAvatarComponent } from '../../shared/components/member/member-avatar.component';
@@ -49,6 +49,7 @@ import { sheetOverlay, sheetPanel } from '../../animations/route.animations';
 interface LatestEntry {
   tx: Transaction;
   displayTitle: string;
+  storyLine: string;
   impact: number;
 }
 
@@ -132,14 +133,20 @@ export class DashboardComponent implements OnInit {
         isClear: mySettlements.length === 0,
       };
 
-      const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => ({
-        tx,
-        displayTitle:
-          tx.type === 'repayment'
-            ? formatRepaymentTitle(enrichRepaymentOwedBefore(tx, active))
-            : tx.title,
-        impact: memberId ? signedImpactOnMember(tx, memberId, active) : 0,
-      }));
+      const nameOf = (id: string) => this.auth.getMember(id)?.name ?? id;
+      const latestEntries: LatestEntry[] = active.slice(0, 3).map((tx) => {
+        const enriched =
+          tx.type === 'repayment' ? enrichRepaymentOwedBefore(tx, active) : tx;
+        return {
+          tx,
+          displayTitle:
+            tx.type === 'repayment'
+              ? formatRepaymentTitle(enriched)
+              : tx.title,
+          storyLine: formatTransactionStoryLine(enriched, nameOf),
+          impact: memberId ? signedImpactOnMember(tx, memberId, active) : 0,
+        };
+      });
 
       return {
         memberId,
@@ -201,23 +208,6 @@ export class DashboardComponent implements OnInit {
 
   debtorQuipLine(debtorId: string, creditorId: string): string {
     return debtorCardQuip(debtorId, creditorId, this.debtorCardSalt);
-  }
-
-  latestMeta(tx: Transaction): string {
-    if (tx.type === 'advance') {
-      return `${this.pages.payment}：${this.advancePayerNames(tx)}`;
-    }
-    if (tx.type === 'repayment') {
-      const from = this.auth.getMember(tx.fromMemberId ?? '')?.name ?? '';
-      const to = this.auth.getMember(tx.payerId)?.name ?? '';
-      return `${from} → ${to}`;
-    }
-    const n = tx.sourceTransactionIds?.length ?? 0;
-    return `整合了 ${n} 筆`;
-  }
-
-  advancePayerNames(tx: Transaction): string {
-    return formatAdvancePayerNames(tx, (id) => this.auth.getMember(id)?.name ?? id);
   }
 
   roastPreview(debtorId: string, amount: number): string {

@@ -170,7 +170,8 @@
           <div class="min-w-0 flex-1">
             <p class="item-title truncate">{{ entry.displayTitle }}</p>
             <p class="caption-text mt-1">
-              {{ entry.tx | transactionDate }} · {{ latestMeta(entry.tx) }}
+              {{ entry.tx | transactionDate }}
+              <ng-container *ngIf="entry.storyLine"> · {{ entry.storyLine }}</ng-container>
             </p>
           </div>
           <div

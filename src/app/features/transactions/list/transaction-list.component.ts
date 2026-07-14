@@ -48,6 +48,7 @@ import { prefetchTransactionCreateRoute } from '../../../core/routing/lazy-route
 interface ListEntry {
   tx: Transaction;
   displayTitle: string;
+  consolidateTitle: string;
   impact: number;
   impactDisplay: ViewerImpactDisplay;
   consolidatable: boolean;
@@ -131,12 +132,12 @@ export class TransactionListComponent implements OnInit {
         const enriched =
           tx.type === 'repayment' ? enrichRepaymentOwedBefore(tx, active) : tx;
         const memberNets = memberNetRowsForTransaction(tx, active);
+        const displayTitle =
+          tx.type === 'repayment' ? formatRepaymentTitle(enriched) : tx.title;
         return {
           tx,
-          displayTitle:
-            tx.type === 'repayment'
-              ? formatRepaymentTitle(enriched)
-              : tx.title,
+          displayTitle,
+          consolidateTitle: displayTitle,
           impact,
           impactDisplay: formatViewerImpact(tx, viewerId, active),
           consolidatable: isConsolidatable(tx),
@@ -147,7 +148,7 @@ export class TransactionListComponent implements OnInit {
               : tx.type === 'repayment'
                 ? repaymentCreditorIds(enriched)
                 : [],
-          storyLine: formatTransactionStoryLine(tx, nameOf),
+          storyLine: formatTransactionStoryLine(enriched, nameOf),
           listTime: formatTransactionListTime(tx),
           listDate: formatTransactionPickDate(tx),
           participantLine: formatConsolidatePickParticipants(

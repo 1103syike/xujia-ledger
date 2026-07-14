@@ -19,16 +19,8 @@
             </div>
             <p class="caption-text mt-1">
               {{ entry.tx | transactionDate }}
-              <ng-container *ngIf="entry.tx.type === 'advance'">
-                · {{ entry.tx.splitMode === 'equal' ? split.equal : split.custom }}
-                · {{ advancePayerNames(entry.tx) }} {{ terms.payer }}
-              </ng-container>
-              <ng-container *ngIf="entry.tx.type === 'repayment'">
-                · {{ auth.getMember(entry.tx.fromMemberId ?? '')?.name }}
-                還給 {{ auth.getMember(entry.tx.payerId)?.name }}
-              </ng-container>
+              <ng-container *ngIf="entry.storyLine"> · {{ entry.storyLine }}</ng-container>
               <ng-container *ngIf="entry.tx.type === 'transfer'">
-                · 整合了 {{ entry.tx.sourceTransactionIds?.length ?? 0 }} 筆記錄
                 <ng-container *ngIf="counterpartyId && transferPairLabel(entry) as label">
                   · {{ label }}
                 </ng-container>

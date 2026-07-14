@@ -97,4 +97,26 @@ describe('transaction-summary', () => {
 
     expect(formatTransactionStoryLine(tx, nameOf)).toBe('鄭丞恩 還給 林庭郁');
   });
+
+  it('appends overpay amounts on repayment story', () => {
+    const tx: Transaction = {
+      id: '1',
+      accountId: 'default',
+      type: 'repayment',
+      title: '超額還款',
+      totalAmount: 954,
+      payerId: 'p2',
+      fromMemberId: 'p3',
+      repaymentOwedBefore: 754,
+      status: 'active',
+      createdBy: 'p3',
+      createdAt: '',
+      updatedAt: '',
+      participants: [],
+    };
+
+    expect(formatTransactionStoryLine(tx, nameOf)).toBe(
+      '鄭丞恩 還給 林庭郁 · 954／754（+200）'
+    );
+  });
 });

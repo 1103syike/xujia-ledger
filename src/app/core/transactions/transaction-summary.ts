@@ -5,6 +5,7 @@ import {
   getAdvancePayers,
 } from '../transactions/advance-allocation';
 import { filterManualLineItems, formatAdvancePayerNames } from './advance-display';
+import { repaymentStoryAmountSuffix } from './repayment-display';
 
 /** @deprecated 使用 formatTransactionStoryLine */
 export const formatTransactionSummaryLine = formatTransactionStoryLine;
@@ -29,7 +30,9 @@ export function formatTransactionStoryLine(
   if (tx.type === 'repayment') {
     const from = nameOf(tx.fromMemberId ?? '');
     const to = nameOf(tx.payerId);
-    return `${from} 還給 ${to}`;
+    const base = `${from} 還給 ${to}`;
+    const suffix = repaymentStoryAmountSuffix(tx);
+    return suffix ? `${base} · ${suffix}` : base;
   }
 
   if (tx.type === 'transfer') {

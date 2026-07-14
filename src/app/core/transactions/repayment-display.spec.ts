@@ -1,5 +1,6 @@
 import {
   formatRepaymentTitle,
+  repaymentStoryAmountSuffix,
   repaymentCreditorIds,
   repaymentMemberNetRows,
 } from './repayment-display';
@@ -39,7 +40,6 @@ describe('repayment-display', () => {
   });
 
   it('shows reverse residual when repayment exceeds debt', () => {
-    // 原本欠 754、還 954 → 多還 200：付款人變債主
     const tx = repayment({ repaymentOwedBefore: 754 });
     const byId = new Map(
       repaymentMemberNetRows(tx).map((row) => [row.memberId, row.net])
@@ -50,13 +50,15 @@ describe('repayment-display', () => {
     expect(repaymentCreditorIds(tx)).toEqual(['zheng']);
   });
 
-  it('formats overpay title as 超額還款（還款/欠款,+超額）', () => {
+  it('uses 超額還款 title and story suffix 還款／欠款（+超額）', () => {
     const tx = repayment({ repaymentOwedBefore: 754 });
-    expect(formatRepaymentTitle(tx)).toBe('超額還款（954/754,+200）');
+    expect(formatRepaymentTitle(tx)).toBe('超額還款');
+    expect(repaymentStoryAmountSuffix(tx)).toBe('954／754（+200）');
   });
 
-  it('formats normal repayment title as 還款', () => {
+  it('formats normal repayment title as 還款 without suffix', () => {
     const tx = repayment({ repaymentOwedBefore: 954 });
     expect(formatRepaymentTitle(tx)).toBe('還款');
+    expect(repaymentStoryAmountSuffix(tx)).toBeNull();
   });
 });

@@ -16,16 +16,20 @@ export function isRepaymentOverpay(tx: Transaction): boolean {
   );
 }
 
-/** 列表／明細標題：超額還款（還款/欠款,+超額） */
+/** 列表／明細標題：一般「還款」、超額「超額還款」 */
 export function formatRepaymentTitle(tx: Transaction): string {
   if (tx.type !== 'repayment') return tx.title;
-  if (!isRepaymentOverpay(tx)) {
-    return tx.title || COPY_RECORD_TYPE.repayment;
-  }
+  if (isRepaymentOverpay(tx)) return COPY_RECORD_TYPE.repaymentOverpay;
+  return tx.title || COPY_RECORD_TYPE.repayment;
+}
+
+/** 超額副資訊：954／754（+200）；非超額回 null */
+export function repaymentStoryAmountSuffix(tx: Transaction): string | null {
+  if (!isRepaymentOverpay(tx)) return null;
   const owed = tx.repaymentOwedBefore ?? 0;
   const paid = tx.totalAmount;
   const excess = paid - owed;
-  return `${COPY_RECORD_TYPE.repaymentOverpay}（${paid}/${owed},+${excess}）`;
+  return `${paid}／${owed}（+${excess}）`;
 }
 
 /**

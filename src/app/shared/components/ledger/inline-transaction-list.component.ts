@@ -26,10 +26,12 @@ import {
 import { MemberAvatarComponent } from '../member/member-avatar.component';
 import { TransactionDatePipe } from '../../../shared/pipes/transaction-date.pipe';
 import { COPY_EMPTY, COPY_SPLIT, COPY_TERMS } from '../../../copy';
+import { formatTransactionStoryLine } from '../../../core/transactions/transaction-summary';
 
 export interface InlineTransactionEntry {
   tx: Transaction;
   displayTitle: string;
+  storyLine: string;
   impact: number;
   splitParticipants: { memberId: string; amount: number }[];
 }
@@ -82,24 +84,28 @@ export class InlineTransactionListComponent implements OnChanges {
   }
 
   private rebuildEntries(): void {
-    this.entries = this.transactions.map((tx) => ({
-      tx,
-      displayTitle:
+    const nameOf = (id: string) => this.auth.getMember(id)?.name ?? id;
+    this.entries = this.transactions.map((tx) => {
+      const enriched =
         tx.type === 'repayment'
-          ? formatRepaymentTitle(
-              enrichRepaymentOwedBefore(tx, this.transactions)
-            )
-          : tx.title,
-      impact: this.viewerId
-        ? this.counterpartyId
-          ? signedImpactOnPair(tx, this.viewerId, this.counterpartyId)
-          : signedImpactOnMember(tx, this.viewerId, this.transactions)
-        : 0,
-      splitParticipants:
-        tx.type === 'advance'
-          ? tx.participants.filter((p) => p.amount > 0)
-          : [],
-    }));
+          ? enrichRepaymentOwedBefore(tx, this.transactions)
+          : tx;
+      return {
+        tx,
+        displayTitle:
+          tx.type === 'repayment' ? formatRepaymentTitle(enriched) : tx.title,
+        storyLine: formatTransactionStoryLine(enriched, nameOf),
+        impact: this.viewerId
+          ? this.counterpartyId
+            ? signedImpactOnPair(tx, this.viewerId, this.counterpartyId)
+            : signedImpactOnMember(tx, this.viewerId, this.transactions)
+          : 0,
+        splitParticipants:
+          tx.type === 'advance'
+            ? tx.participants.filter((p) => p.amount > 0)
+            : [],
+      };
+    });
   }
 
   advancePayerNames(tx: Transaction): string {

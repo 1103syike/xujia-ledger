@@ -138,8 +138,15 @@ export class TransactionDetailComponent {
     );
   }
 
-  storyLine(tx: Transaction): string {
-    return formatTransactionStoryLine(tx, (id) => this.auth.getMember(id)?.name ?? id);
+  storyLine(tx: Transaction, activeList: Transaction[] = []): string {
+    const viewTx =
+      tx.type === 'repayment'
+        ? enrichRepaymentOwedBefore(tx, activeList)
+        : tx;
+    return formatTransactionStoryLine(
+      viewTx,
+      (id) => this.auth.getMember(id)?.name ?? id
+    );
   }
 
   isAdvancePayer(tx: Transaction, memberId: string): boolean {
