@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -214,7 +214,9 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     private fb: FormBuilder,
     private transactions: TransactionService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private ngZone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {
     const defaultPayer = auth.currentMember?.id ?? '';
     this.advanceForm = this.fb.group({
@@ -331,11 +333,14 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.clearFormFocusBlurTimer();
     this.formFieldFocused = true;
     this.keyboardMonitor.start((open) => {
-      this.isKeyboardOpen = open;
-      // 鍵盤已關且不再編輯 → 解除監聽
-      if (!open && !this.formFieldFocused) {
-        this.keyboardMonitor.stop();
-      }
+      this.ngZone.run(() => {
+        this.isKeyboardOpen = open;
+        this.cdr.markForCheck();
+        // 鍵盤已關且不再編輯 → 解除監聽
+        if (!open && !this.formFieldFocused) {
+          this.keyboardMonitor.stop();
+        }
+      });
     });
   }
 

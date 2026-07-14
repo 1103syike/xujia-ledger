@@ -19,7 +19,7 @@ export type ReleaseEntry = {
  * - ZZ = 小版本
  * 大版本寫成 XX.YY（兩段），不附敘述。
  */
-export const CURRENT_APP_VERSION = '16.3.3';
+export const CURRENT_APP_VERSION = '16.3.4';
 
 /** 此日期起顯示含時分的發佈時間 */
 const DETAILED_TIME_CUTOFF = new Date('2026-06-22T00:00:00+08:00');
@@ -116,6 +116,14 @@ export const RELEASE_HISTORY: ReleaseEntry[] = [
     title: '修手機鍵盤與提交列搶畫面',
     highlights: [
       '改以 visualViewport 判斷鍵盤開關，底部「記一筆」不再亂冒出',
+    ],
+  },
+  {
+    version: '16.3.4',
+    releasedAt: '2026-07-14T15:36:00+08:00',
+    title: '修正鍵盤開啟時提交列仍顯示',
+    highlights: [
+      '改用基準高度偵測鍵盤，並確保畫面會跟著刷新',
     ],
   },
   {
