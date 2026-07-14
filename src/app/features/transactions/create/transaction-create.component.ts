@@ -51,6 +51,7 @@ import {
   distributeHybridSplitAmounts,
   distributeSplitAmounts,
 } from '../../../core/transactions/split-distribution';
+import { resolveSyncedConsumptionTotal } from '../../../core/transactions/consumption-total-sync';
 import { VirtualKeyboardMonitor } from '../../../core/infra/virtual-keyboard';
 import {
   serviceFeeSharesByMember,
@@ -904,7 +905,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       this.payerRows = [
         { memberId, amount: row.amount, locked: row.locked },
       ];
-      this.refreshPreview();
+      // 未鎖定時把實付重新對齊總額（預設「全部」）
+      this.refreshPreview({ syncPayers: true });
     }
   }
 
@@ -1203,7 +1205,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     if (this.payerRows.length === 1) {
       const row = this.payerRows[0];
       this.payerRows = [{ memberId: id, amount: row.amount, locked: row.locked }];
-      this.refreshPreview();
+      this.refreshPreview({ syncPayers: true });
     }
   }
 
@@ -1478,15 +1480,25 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return this.sumBaseParticipatingSplits() + this.serviceFeeAmount();
   }
 
-  /** 未填消費總額時，用分攤合計帶入（不含服務費）；已填的總額不覆寫 */
+  /**
+   * 對齊消費總額：
+   * - 專屬細項加總超過既有總額 → 拉高（由下往上記帳，避免總額卡在第一筆）
+   * - 尚未填總額 → 用分攤合計帶入（不含服務費）
+   * - 其餘已填總額不覆寫（留給「總額錨定＋共同剩餘」）
+   */
   private syncTotalAmountFieldFromSplits(): void {
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
-    if (fromField > 0) return;
-
+    const exclusiveSum = this.sumExclusiveLineItems();
     const fromSplits = this.sumBaseParticipatingSplits();
-    if (fromSplits > 0) {
-      this.advanceForm.patchValue({ totalAmount: fromSplits }, { emitEvent: false });
-    }
+    const nextTotal = resolveSyncedConsumptionTotal(
+      fromField,
+      exclusiveSum,
+      fromSplits
+    );
+
+    if (nextTotal === fromField) return;
+
+    this.advanceForm.patchValue({ totalAmount: nextTotal }, { emitEvent: false });
   }
 
   private sumExclusiveLineItems(): number {
