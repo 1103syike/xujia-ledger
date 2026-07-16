@@ -7,6 +7,10 @@ export const COPY_SPLIT = {
   nPeople: (n: number) => `${n} 人分`,
   bears: (name: string) => `${name} 承擔`,
   skipped: '沒參與',
+  /** 有參與這筆，但不用分共同消費（只付自己的專屬） */
+  noCommonShare: '免均分',
+  sharesCommon: '有均分',
+  noCommonShareHint: '只付自己的，不進共同（例如自己一盒泡芙）',
   /** 有專屬細項時：剩餘共同消費均分提示 */
   sharedRemainderExact: (remainder: number, perPerson: number) =>
     `共同消費 NT$ ${remainder}（每人 NT$ ${perPerson}）`,

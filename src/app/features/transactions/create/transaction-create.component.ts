@@ -54,6 +54,8 @@ import {
 import { resolveSyncedConsumptionTotal } from '../../../core/transactions/consumption-total-sync';
 import { VirtualKeyboardMonitor } from '../../../core/infra/virtual-keyboard';
 import {
+  normalizeServiceFeeSplitMode,
+  ServiceFeeSplitMode,
   serviceFeeSharesByMember,
   subtractServiceFeeFromAmounts,
 } from '../../../core/transactions/service-fee-split';
@@ -69,7 +71,6 @@ import { formatOweAmount } from '../../../core/ledger/settlement-display';
 import { amountViewerOwesOther } from '../../../core/ledger/ledger-calculator';
 import { activeTransactions, formatTransactionDateLabel, todayLocalDate } from '../../../core/transactions/transaction-date';
 import { MemberAvatarComponent } from '../../../shared/components/member/member-avatar.component';
-import { MemberSelectGridComponent } from '../../../shared/components/member/member-select-grid.component';
 import { MemberPickerComponent } from '../../../shared/components/member/member-picker.component';
 import { DateFieldComponent } from '../../../shared/components/form/date-field.component';
 import { SplitPieChartComponent } from '../../../shared/components/ledger/split-pie-chart.component';
@@ -92,6 +93,8 @@ import {
   createFormSnapshotsEqual,
   serializeCreateFormSnapshot,
 } from '../../../core/forms/create-form-snapshot';
+import { DigitsOnlyDirective } from '../../../shared/directives/digits-only.directive';
+import { sumAmounts, toAmount } from '../../../shared/utils/amount';
 
 type CreateMode = 'advance' | 'repayment' | 'transfer';
 
@@ -115,13 +118,13 @@ interface PayerDraft {
     ReactiveFormsModule,
     RouterLink,
     MemberAvatarComponent,
-    MemberSelectGridComponent,
     MemberPickerComponent,
     DateFieldComponent,
     SplitPieChartComponent,
     ConfirmDialogComponent,
     KaomojiDecoComponent,
     TransferBreakdownComponent,
+    DigitsOnlyDirective,
   ],
   templateUrl: './transaction-create.component.html',
 
@@ -148,6 +151,10 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   noRepaySalt = 0;
   splitRule: SplitRule = 'equal';
   customInputMethod: CustomInputMethod = 'lineItems';
+  /** 服務費：均分 or 依基礎消費比例 */
+  serviceFeeSplitMode: ServiceFeeSplitMode = 'equal';
+  /** 切換服務費模式時用來重播按鈕特效 */
+  feeModeTick = 0;
   memberItems: Record<string, LineItem[]> = {};
   memberDrafts: Record<string, MemberDraft> = {};
   memberSubtotals: Record<string, number> = {};
@@ -160,6 +167,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   payingCount = 0;
   /** 虛擬鍵盤開啟時隱藏底部提交列（由 visualViewport 判斷，不靠 focus 猜測） */
   isKeyboardOpen = false;
+  /** 正在改消費總額：先不要自動 patch，避免刪數字時被蓋回去 */
+  totalAmountFocused = false;
+  /** 使用者有明確設定消費總額（深色）；否則淺色跟隨應付加總 */
+  totalAmountAnchored = false;
+  private totalAmountEditBaseline = '';
   error = '';
   private formFocusBlurTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly keyboardMonitor = new VirtualKeyboardMonitor();
@@ -183,11 +195,35 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }> = [];
   payerRows: PayerDraft[] = [];
   addingItemFor: string | null = null;
+  /** 新增品項按鈕特效：哪個成員、第幾次點 */
+  addItemPopFor: string | null = null;
+  addItemTick = 0;
+  /** 有均分／免均分按鈕特效 */
+  commonSharePopFor: string | null = null;
+  commonShareTick = 0;
+  /** 剛加入的品項列（memberId:index），用來播進場動畫 */
+  lastAddedItemKey: string | null = null;
+  /** 誰在花錢 chips 點擊彈一下：`'all'` 或 memberId */
+  participantChipPopKey: string | null = null;
+  participantChipPopTick = 0;
+  /** 點全家時成員 chips 依序彈 */
+  participantCascadeTick = 0;
+  /** 誰在付錢 tile 點擊彈一下 */
+  payerChipPopKey: string | null = null;
+  payerChipPopTick = 0;
+  /** 金額欄送出後的確認動效：key → tick（每次 +1 重播） */
+  amountPulseTicks: Record<string, number> = {};
+  lastAddedItemTick = 0;
+  /** 正被幹掉的品項列（memberId:index） */
+  slayingItemKey: string | null = null;
+  private slayTimer: ReturnType<typeof setTimeout> | null = null;
   participantTuningOpen = false;
   activeParticipantKey = '';
   recentDateOptions: string[] = [];
   titleSuggestionOptions: string[] = [];
   private splitLocked = new Set<string>();
+  /** 不參與共同均分（仍可付專屬細項，例：自己一盒泡芙） */
+  private noCommonShareMembers = new Set<string>();
   private initialWithMemberId: string | null = null;
   private participantPrefsApplied = false;
   splitAmountInputs: Record<string, string> = {};
@@ -199,6 +235,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   isEditMode = false;
   editTransactionId: string | null = null;
   private skippedMembers = new Set<string>();
+  /** 點「全家」全選前的參與名單，再點一次用來還原 */
+  private participantsBeforeSelectAll: string[] | null = null;
   private subs: Subscription[] = [];
   private activeTx: Transaction[] = [];
   private initialRepaymentToId: string | null = null;
@@ -325,6 +363,10 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnDestroy(): void {
     this.clearFormFocusBlurTimer();
+    if (this.slayTimer) {
+      clearTimeout(this.slayTimer);
+      this.slayTimer = null;
+    }
     this.keyboardMonitor.stop();
     this.subs.forEach((s) => s.unsubscribe());
   }
@@ -463,11 +505,13 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
           v.serviceFee === null || v.serviceFee === ''
             ? null
             : Number(v.serviceFee),
+        serviceFeeSplitMode: this.serviceFeeSplitMode,
         billTotal:
           v.billTotal === null || v.billTotal === ''
             ? null
             : Number(v.billTotal),
         skippedMembers: [...this.skippedMembers],
+        noCommonShareMembers: [...this.noCommonShareMembers],
         memberItems: this.pruneSplitItems(),
         manualAmounts: { ...this.manualAmounts },
         splitAmountInputs: { ...this.splitAmountInputs },
@@ -696,7 +740,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return `每人約 NT$ ${base}（含零頭分配）`;
   }
 
-  /** 有專屬細項時，顯示共同消費剩餘均分 */
+  /** 有專屬細項時，顯示共同消費剩餘均分（只算會進均分的人） */
   get sharedRemainderLabel(): string | null {
     if (!this.hasAnyLineItems || this.payingCount === 0) return null;
 
@@ -707,11 +751,22 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     const remainder = total - exclusiveSum;
     if (remainder <= 0) return null;
 
-    const perPerson = Math.floor(remainder / this.payingCount);
-    if (remainder % this.payingCount === 0) {
+    const shareCount = this.commonShareParticipantCount();
+    if (shareCount <= 0) {
+      return `共同消費 NT$ ${remainder}（尚無人均分）`;
+    }
+
+    const perPerson = Math.floor(remainder / shareCount);
+    if (remainder % shareCount === 0) {
       return COPY_SPLIT.sharedRemainderExact(remainder, perPerson);
     }
     return COPY_SPLIT.sharedRemainderApprox(remainder, perPerson);
+  }
+
+  private commonShareParticipantCount(): number {
+    return this.members.filter(
+      (m) => !this.isSkipped(m.id) && this.sharesCommon(m.id)
+    ).length;
   }
 
   get hasAnyLineItems(): boolean {
@@ -773,24 +828,51 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   selectAllParticipants(): void {
     if (this.isAllGroupActive()) {
-      // 已全家再點一次 → 清空（跟單人 chip 可取消一致）
-      this.applyParticipantMemberIds([]);
+      // 已全家再點一次 → 還原成點全家之前的名單（例如只選林庭郁）
+      const restore = this.participantsBeforeSelectAll;
+      this.participantsBeforeSelectAll = null;
+      if (restore && restore.length > 0) {
+        this.applyParticipantMemberIds(restore);
+      } else {
+        // 沒有快取（一進來就是全家）→ 維持可取消，清空
+        this.applyParticipantMemberIds([]);
+      }
     } else {
+      this.participantsBeforeSelectAll = this.members
+        .filter((m) => !this.isSkipped(m.id))
+        .map((m) => m.id);
       this.applyParticipantMemberIds(this.members.map((m) => m.id));
     }
+    this.pulseParticipantAllChips();
     this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
   toggleParticipantMember(memberId: string): void {
     if (this.isSkipped(memberId)) {
       this.toggleSkip(memberId);
+      this.pulseParticipantChip(memberId);
       return;
     }
 
     const activeCount = this.members.filter((m) => !this.isSkipped(m.id)).length;
-    if (activeCount <= 1) return;
+    if (activeCount <= 1) {
+      this.pulseParticipantChip(memberId);
+      return;
+    }
 
     this.toggleSkip(memberId);
+    this.pulseParticipantChip(memberId);
+  }
+
+  private pulseParticipantChip(memberId: string): void {
+    this.participantChipPopKey = memberId;
+    this.participantChipPopTick += 1;
+  }
+
+  private pulseParticipantAllChips(): void {
+    this.participantChipPopKey = 'all';
+    this.participantChipPopTick += 1;
+    this.participantCascadeTick += 1;
   }
 
   toggleParticipantTuning(): void {
@@ -803,18 +885,40 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   /** 該員細項合計（不含共同剩餘） */
   memberExclusiveTotal(memberId: string): number {
-    return (this.memberItems[memberId] ?? []).reduce(
-      (sum, item) => sum + item.amount,
-      0
-    );
+    return sumAmounts((this.memberItems[memberId] ?? []).map((item) => item.amount));
   }
 
-  /** 該員分到的共同消費（應付 − 專屬細項） */
+  /** 該員分到的共同消費（基礎應付 − 專屬細項） */
   memberCommonShare(memberId: string): number {
     if (this.isSkipped(memberId) || !this.hasAnyLineItems) return 0;
     const exclusive = this.memberExclusiveTotal(memberId);
     const allocated = this.memberBaseSubtotals[memberId] ?? 0;
     return Math.max(0, allocated - exclusive);
+  }
+
+  /** 該員分到的服務費 */
+  memberServiceFeeShare(memberId: string): number {
+    if (this.isSkipped(memberId) || this.serviceFeeAmount() <= 0) return 0;
+    const base = this.memberBaseSubtotals[memberId] ?? 0;
+    const total = this.memberSubtotals[memberId] ?? 0;
+    return Math.max(0, total - base);
+  }
+
+  /** 卡片下方是否要列出細項／共同／服務費 */
+  hasMemberBreakdown(memberId: string): boolean {
+    if (this.isSkipped(memberId)) return false;
+    return (
+      this.memberHasLineItems(memberId) ||
+      this.memberCommonShare(memberId) > 0 ||
+      this.memberServiceFeeShare(memberId) > 0
+    );
+  }
+
+  /** 應付直接顯示合計（含服務費），不再用可編輯欄位當總額 */
+  showsAllocatedTotal(memberId: string): boolean {
+    return (
+      this.memberHasLineItems(memberId) || this.memberServiceFeeShare(memberId) > 0
+    );
   }
 
   isSplitAmountLocked(memberId: string): boolean {
@@ -823,19 +927,43 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   splitAmountDisplay(memberId: string): string {
     if (this.splitAmountInputs[memberId] !== undefined) {
-      return this.splitAmountInputs[memberId];
+      return this.formatAmountInputValue(this.splitAmountInputs[memberId]);
     }
     const amount = this.manualAmounts[memberId];
-    return amount ? String(amount) : '';
+    return amount && amount > 0 ? String(amount) : '';
   }
 
-  setSplitAmount(memberId: string, value: string): void {
+  /** 顯示用：0／空字串都當空，避免點進去還自帶一個 0 */
+  private formatAmountInputValue(raw: string | number | null | undefined): string {
+    if (raw === null || raw === undefined) return '';
+    const text = String(raw).trim();
+    if (!text || text === '0') return '';
+    const n = Number(text);
+    if (!Number.isNaN(n) && n === 0) return '';
+    return text;
+  }
+
+  /** 點進應付：若是 0 就清掉；有數字就全選方便直接蓋過 */
+  focusSplitAmount(memberId: string): void {
     if (this.memberHasLineItems(memberId)) return;
-    this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: value };
+    const shown = this.splitAmountDisplay(memberId);
+    if (!shown && this.splitAmountInputs[memberId]) {
+      this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: '' };
+    }
+  }
+
+  setSplitAmount(memberId: string, value: string | number | null): void {
+    if (this.memberHasLineItems(memberId)) return;
+    const next =
+      value === null || value === undefined ? '' : String(value);
+    this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: next };
   }
 
   commitSplitAmount(memberId: string): void {
     if (this.memberHasLineItems(memberId)) return;
+
+    const beforeSplits = { ...this.splitAmountInputs };
+    const beforePayers = this.snapshotPayerAmounts();
 
     const raw = String(this.splitAmountInputs[memberId] ?? '').trim();
     if (!raw) {
@@ -848,8 +976,12 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       this.manualAmounts = { ...this.manualAmounts, [memberId]: amount };
       this.splitAmountInputs = { ...this.splitAmountInputs, [memberId]: String(amount) };
       this.splitLocked.add(memberId);
+      this.pulseAmountField(`split:${memberId}`);
     }
     this.refreshPreview({ syncSplits: true, syncPayers: true });
+    this.pulseChangedSplitAmounts(beforeSplits, memberId);
+    this.pulseChangedPayerAmounts(beforePayers);
+    this.pulseAmountField('sticky');
   }
 
   private refreshCreatePrefs(viewerId?: string): void {
@@ -872,6 +1004,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     );
     this.activeParticipantKey = participantGroupKey(memberIds);
     this.splitLocked.clear();
+    this.noCommonShareMembers.clear();
     this.splitAmountInputs = {};
     const nextItems: Record<string, LineItem[]> = {};
     for (const [id, items] of Object.entries(this.memberItems)) {
@@ -899,21 +1032,105 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.tryCaptureBaseline();
   }
 
-  selectPrimaryPayer(memberId: string): void {
-    if (this.payerRows.length === 1) {
-      const row = this.payerRows[0];
-      this.payerRows = [
-        { memberId, amount: row.amount, locked: row.locked },
-      ];
-      // 未鎖定時把實付重新對齊總額（預設「全部」）
-      this.refreshPreview({ syncPayers: true });
+  isPayer(memberId: string): boolean {
+    return this.payerRows.some((row) => row.memberId === memberId);
+  }
+
+  /** 實付列表依成員順序，不是按勾選先後亂跳 */
+  get orderedPayerMembers(): DisplayMember[] {
+    const payerIds = new Set(this.payerRows.map((row) => row.memberId));
+    return this.members.filter((m) => payerIds.has(m.id));
+  }
+
+  isPayerAmountLocked(memberId: string): boolean {
+    return this.payerRows.find((row) => row.memberId === memberId)?.locked ?? false;
+  }
+
+  payerAmountOf(memberId: string): string {
+    return this.formatAmountInputValue(
+      this.payerRows.find((row) => row.memberId === memberId)?.amount ?? ''
+    );
+  }
+
+  focusPayerAmount(memberId: string): void {
+    const shown = this.payerAmountOf(memberId);
+    if (!shown) {
+      const index = this.payerRows.findIndex((row) => row.memberId === memberId);
+      if (index >= 0 && this.payerRows[index].amount) {
+        this.payerRows[index].amount = '';
+      }
     }
   }
 
-  disabledPayerIdsForRow(index: number): string[] {
-    return this.payerRows
-      .map((row, i) => (i === index ? '' : row.memberId))
-      .filter(Boolean);
+  /** 點一下切換是否付錢；不能全部取消（至少留一位） */
+  togglePayerMember(memberId: string): void {
+    this.payerChipPopKey = memberId;
+    this.payerChipPopTick += 1;
+
+    if (this.isPayer(memberId)) {
+      if (this.payerRows.length <= 1) return;
+      this.payerRows = this.payerRows.filter((row) => row.memberId !== memberId);
+      this.refreshPreview({ syncPayers: true });
+      return;
+    }
+
+    this.payerRows = [
+      ...this.payerRows,
+      { memberId, amount: '', locked: false },
+    ];
+    this.refreshPreview({ syncPayers: true });
+  }
+
+  setPayerAmountByMember(memberId: string, value: string | number | null): void {
+    const index = this.payerRows.findIndex((row) => row.memberId === memberId);
+    if (index < 0) return;
+    this.setPayerAmount(index, value);
+  }
+
+  commitPayerAmountByMember(memberId: string): void {
+    const index = this.payerRows.findIndex((row) => row.memberId === memberId);
+    if (index < 0) return;
+    this.commitPayerAmount(index);
+  }
+
+  amountPulseOf(key: string): number | null {
+    const tick = this.amountPulseTicks[key];
+    return tick ? tick : null;
+  }
+
+  private pulseAmountField(key: string): void {
+    this.amountPulseTicks = {
+      ...this.amountPulseTicks,
+      [key]: (this.amountPulseTicks[key] ?? 0) + 1,
+    };
+  }
+
+  private snapshotPayerAmounts(): Record<string, string> {
+    return Object.fromEntries(
+      this.payerRows.map((row) => [row.memberId, String(row.amount ?? '')])
+    );
+  }
+
+  private pulseChangedPayerAmounts(
+    before: Record<string, string>,
+    skipMemberId?: string
+  ): void {
+    for (const row of this.payerRows) {
+      if (skipMemberId && row.memberId === skipMemberId) continue;
+      if (before[row.memberId] === String(row.amount ?? '')) continue;
+      this.pulseAmountField(`payer:${row.memberId}`);
+    }
+  }
+
+  private pulseChangedSplitAmounts(
+    before: Record<string, string>,
+    skipMemberId?: string
+  ): void {
+    for (const memberId of Object.keys(this.splitAmountInputs)) {
+      if (skipMemberId && memberId === skipMemberId) continue;
+      if (before[memberId] === this.splitAmountInputs[memberId]) continue;
+      this.pulseAmountField(`split:${memberId}`);
+    }
   }
 
   previewAmountFor(memberId: string): number {
@@ -922,6 +1139,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   toggleAddItem(memberId: string): void {
     this.addingItemFor = this.addingItemFor === memberId ? null : memberId;
+    this.addItemPopFor = memberId;
+    this.addItemTick += 1;
   }
 
   goToTransactions(): void {
@@ -949,15 +1168,20 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.payerRows = [{ memberId: defaultPayer, amount: '', locked: false }];
     this.splitRule = 'equal';
     this.customInputMethod = 'lineItems';
+    this.serviceFeeSplitMode = 'equal';
     this.memberItems = {};
     this.manualAmounts = {};
     this.splitAmountInputs = {};
     this.splitLocked.clear();
+    this.noCommonShareMembers.clear();
     this.participantTuningOpen = false;
     this.participantPrefsApplied = false;
     this.skippedMembers = new Set();
+    this.participantsBeforeSelectAll = null;
     this.addingItemFor = null;
     this.error = '';
+    this.totalAmountAnchored = false;
+    this.totalAmountEditBaseline = '';
     this.remainderSeed = crypto.randomUUID?.() ?? String(Date.now());
     this.initDrafts();
     const viewerId = this.auth.currentMember?.id;
@@ -1044,7 +1268,10 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       return;
     }
     this.error = '';
-    this.memberItems = { ...this.memberItems, [memberId]: [...(this.memberItems[memberId] ?? []), { note, amount }] };
+    const nextItems = [...(this.memberItems[memberId] ?? []), { note, amount }];
+    this.memberItems = { ...this.memberItems, [memberId]: nextItems };
+    this.lastAddedItemKey = `${memberId}:${nextItems.length - 1}`;
+    this.lastAddedItemTick += 1;
     this.splitLocked.add(memberId);
     draft.note = '';
     draft.amount = '';
@@ -1053,10 +1280,46 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.refreshPreview({ syncSplits: true, syncPayers: true });
   }
 
+  isJustAddedItem(memberId: string, index: number): boolean {
+    return (
+      this.lastAddedItemTick > 0 &&
+      this.lastAddedItemKey === `${memberId}:${index}`
+    );
+  }
+
   removeMemberItem(memberId: string, index: number): void {
+    const key = `${memberId}:${index}`;
+    // 正在被幹掉 → 忽略連點
+    if (this.slayingItemKey) return;
+
+    const prefersReduced =
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      this.commitRemoveMemberItem(memberId, index);
+      return;
+    }
+
+    this.slayingItemKey = key;
+    this.slayTimer = setTimeout(() => {
+      this.slayTimer = null;
+      this.slayingItemKey = null;
+      this.commitRemoveMemberItem(memberId, index);
+    }, 430);
+  }
+
+  isSlayingItem(memberId: string, index: number): boolean {
+    return this.slayingItemKey === `${memberId}:${index}`;
+  }
+
+  private commitRemoveMemberItem(memberId: string, index: number): void {
     const next = [...(this.memberItems[memberId] ?? [])];
+    if (index < 0 || index >= next.length) return;
     next.splice(index, 1);
     this.memberItems = { ...this.memberItems, [memberId]: next };
+    if (this.lastAddedItemKey === `${memberId}:${index}`) {
+      this.lastAddedItemKey = null;
+    }
     if (next.length === 0) {
       this.splitLocked.delete(memberId);
     }
@@ -1072,50 +1335,19 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return this.stickySummary.change;
   }
 
-  membersForPayerRow(index: number): DisplayMember[] {
-    const taken = new Set(
-      this.payerRows
-        .map((row, i) => (i === index ? '' : row.memberId))
-        .filter(Boolean)
-    );
-    return this.members.filter((m) => !taken.has(m.id));
-  }
-
-  addPayer(): void {
-    const available = this.members.find(
-      (m) => !this.payerRows.some((row) => row.memberId === m.id)
-    );
-    this.payerRows = [
-      ...this.payerRows,
-      { memberId: available?.id ?? '', amount: '', locked: false },
-    ];
-    this.refreshPreview({ syncPayers: true });
-  }
-
-  removePayer(index: number): void {
-    if (this.payerRows.length <= 1) return;
-    this.payerRows = this.payerRows.filter((_, i) => i !== index);
-    this.refreshPreview({ syncPayers: true });
-  }
-
-  setPayerMember(index: number, memberId: string): void {
-    const next = [...this.payerRows];
-    next[index] = { ...next[index], memberId };
-    this.payerRows = next;
-    this.refreshPreview();
-  }
-
-  /** 輸入中只改金額，不要換掉 row 物件（否則 *ngFor 會重建 input 導致失焦） */
-  setPayerAmount(index: number, value: string): void {
+  /** 輸入中只改金額，不要換掉 row 物件（否則畫面會重建 input 導致失焦） */
+  setPayerAmount(index: number, value: string | number | null): void {
     const row = this.payerRows[index];
     if (!row) return;
-    row.amount = value;
+    row.amount = value === null || value === undefined ? '' : String(value);
   }
 
   commitPayerAmount(index: number): void {
     const row = this.payerRows[index];
     if (!row) return;
 
+    const memberId = row.memberId;
+    const beforePayers = this.snapshotPayerAmounts();
     const raw = String(row.amount ?? '').trim();
     if (!raw) {
       row.amount = '';
@@ -1123,17 +1355,57 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     } else {
       row.amount = String(Number(raw) || 0);
       row.locked = true;
+      this.pulseAmountField(`payer:${memberId}`);
     }
 
     this.refreshPreview({ syncPayers: true });
+    this.pulseChangedPayerAmounts(beforePayers, memberId);
+    this.pulseAmountField('sticky');
   }
 
-  trackPayerRowByIndex(index: number): number {
-    return index;
-  }
-
-  onSplitTotalCommit(): void {
+  onSplitTotalCommit(field: 'total' | 'fee' = 'total'): void {
+    const beforePayers = this.snapshotPayerAmounts();
+    const beforeSplits = { ...this.splitAmountInputs };
     this.refreshPreview({ syncSplits: true, syncPayers: true });
+    this.pulseAmountField(field);
+    this.pulseChangedSplitAmounts(beforeSplits);
+    this.pulseChangedPayerAmounts(beforePayers);
+    this.pulseAmountField('sticky');
+  }
+
+  onTotalAmountFocus(): void {
+    this.totalAmountFocused = true;
+    this.totalAmountEditBaseline = String(
+      this.advanceForm.value.totalAmount ?? ''
+    );
+  }
+
+  onTotalAmountBlur(): void {
+    this.totalAmountFocused = false;
+    const raw = this.advanceForm.value.totalAmount;
+    const text = raw === null || raw === undefined ? '' : String(raw).trim();
+    const cleared = !text || Number(text) <= 0 || Number.isNaN(Number(text));
+
+    if (cleared) {
+      // 清掉總額 → 改回「淺色跟隨應付」
+      this.totalAmountAnchored = false;
+      this.advanceForm.patchValue({ totalAmount: null }, { emitEvent: false });
+    } else if (text !== this.totalAmountEditBaseline) {
+      // 有改過數字 → 視為使用者設定總額（錨定）
+      this.totalAmountAnchored = true;
+    }
+
+    this.onSplitTotalCommit('total');
+  }
+
+  /** 消費總額是否為使用者錨定（實色手動）；否則淺色自動 */
+  isTotalAmountAnchored(): boolean {
+    return this.totalAmountAnchored;
+  }
+
+  /** 服務費：有填就當手動實色，空／0 為淺色 */
+  isServiceFeeManual(): boolean {
+    return (Number(this.advanceForm.value.serviceFee) || 0) > 0;
   }
 
   private syncSplitAmounts(): void {
@@ -1148,17 +1420,22 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     const nextManual = { ...this.manualAmounts };
     const nextInputs = { ...this.splitAmountInputs };
 
-    // 有細項：專屬細項歸人，剩餘給所有參與者均分（含已有細項的人）
+    // 有細項：專屬歸人；共同剩餘只分給「有均分」的人
     if (this.hasAnyLineItems) {
       const exclusives = participating.map((m) =>
-        (this.memberItems[m.id] ?? []).reduce((sum, item) => sum + item.amount, 0)
+        sumAmounts((this.memberItems[m.id] ?? []).map((item) => item.amount))
       );
-      const amounts = distributeHybridSplitAmounts(subtotal, exclusives);
+      const sharesCommon = participating.map((m) => this.sharesCommon(m.id));
+      const amounts = distributeHybridSplitAmounts(
+        subtotal,
+        exclusives,
+        sharesCommon
+      );
 
       participating.forEach((m, index) => {
         nextManual[m.id] = amounts[index];
         if (!this.memberHasLineItems(m.id)) {
-          nextInputs[m.id] = String(amounts[index]);
+          nextInputs[m.id] = amounts[index] > 0 ? String(amounts[index]) : '';
         }
       });
 
@@ -1167,17 +1444,28 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       return;
     }
 
-    const rows = participating.map((m) => ({
-      amount: Number(this.manualAmounts[m.id]) || 0,
-      locked: this.splitLocked.has(m.id),
-    }));
+    // 無細項：免均分＝鎖在 0（或既有手動鎖金額），其餘人分剩餘
+    const rows = participating.map((m) => {
+      const noCommon = !this.sharesCommon(m.id);
+      const locked = this.splitLocked.has(m.id) || noCommon;
+      return {
+        amount: locked
+          ? noCommon && !this.splitLocked.has(m.id)
+            ? 0
+            : Number(this.manualAmounts[m.id]) || 0
+          : Number(this.manualAmounts[m.id]) || 0,
+        locked,
+      };
+    });
 
     const amounts = distributeSplitAmounts(subtotal, rows);
 
     participating.forEach((m, index) => {
       nextManual[m.id] = amounts[index];
-      if (!this.splitLocked.has(m.id)) {
-        nextInputs[m.id] = String(amounts[index]);
+      if (!this.splitLocked.has(m.id) && this.sharesCommon(m.id)) {
+        nextInputs[m.id] = amounts[index] > 0 ? String(amounts[index]) : '';
+      } else if (!this.sharesCommon(m.id) && !this.splitLocked.has(m.id)) {
+        nextInputs[m.id] = '';
       }
     });
 
@@ -1197,16 +1485,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.payerRows = this.payerRows.map((row, index) => ({
       ...row,
-      amount: String(amounts[index]),
+      amount: amounts[index] > 0 ? String(amounts[index]) : '',
     }));
-  }
-
-  setPayer(id: string): void {
-    if (this.payerRows.length === 1) {
-      const row = this.payerRows[0];
-      this.payerRows = [{ memberId: id, amount: row.amount, locked: row.locked }];
-      this.refreshPreview({ syncPayers: true });
-    }
   }
 
   setSplitRule(rule: SplitRule): void {
@@ -1251,6 +1531,27 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return this.skippedMembers.has(id);
   }
 
+  /** 預設 true；免均分＝只付專屬／手動鎖，不進共同 */
+  sharesCommon(memberId: string): boolean {
+    return !this.noCommonShareMembers.has(memberId);
+  }
+
+  isNoCommonShare(memberId: string): boolean {
+    return this.noCommonShareMembers.has(memberId);
+  }
+
+  toggleNoCommonShare(memberId: string): void {
+    if (this.isSkipped(memberId)) return;
+    this.commonSharePopFor = memberId;
+    this.commonShareTick += 1;
+    if (this.noCommonShareMembers.has(memberId)) {
+      this.noCommonShareMembers.delete(memberId);
+    } else {
+      this.noCommonShareMembers.add(memberId);
+    }
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
   toggleSkip(id: string): void {
     if (this.skippedMembers.has(id)) {
       this.skippedMembers.delete(id);
@@ -1260,6 +1561,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       this.manualAmounts[id] = 0;
       this.memberItems = { ...this.memberItems, [id]: [] };
       this.splitLocked.delete(id);
+      this.noCommonShareMembers.delete(id);
       const nextInputs = { ...this.splitAmountInputs };
       delete nextInputs[id];
       this.splitAmountInputs = nextInputs;
@@ -1454,7 +1756,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     return this.consumptionSubtotal() + this.serviceFeeAmount();
   }
 
-  private consumptionSubtotal(): number {
+  /** 消費總額（不含服務費）；模板也會用來判斷要不要秀「基礎消費」編輯 */
+  consumptionSubtotal(): number {
     // 總額以欄位為準（細項／手動分攤不再覆寫）；欄位空時才用分攤合計補
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
     if (fromField > 0) return fromField;
@@ -1471,9 +1774,11 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private sumBaseParticipatingSplits(): number {
-    return this.members
-      .filter((m) => !this.isSkipped(m.id))
-      .reduce((sum, m) => sum + (this.memberBaseSubtotals[m.id] ?? 0), 0);
+    return sumAmounts(
+      this.members
+        .filter((m) => !this.isSkipped(m.id))
+        .map((m) => this.memberBaseSubtotals[m.id])
+    );
   }
 
   private sumParticipatingSplits(): number {
@@ -1482,37 +1787,53 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
 
   /**
    * 對齊消費總額：
-   * - 專屬細項加總超過既有總額 → 拉高（由下往上記帳，避免總額卡在第一筆）
-   * - 尚未填總額 → 用分攤合計帶入（不含服務費）
-   * - 其餘已填總額不覆寫（留給「總額錨定＋共同剩餘」）
+   * - 已錨定：不因應付增減而改；細項超過才撐開
+   * - 未錨定：總額＝鎖定應付加總（淺色跟隨）
    */
   private syncTotalAmountFieldFromSplits(): void {
+    if (this.totalAmountFocused) return;
+
     const fromField = Number(this.advanceForm.value.totalAmount) || 0;
     const exclusiveSum = this.sumExclusiveLineItems();
-    const fromSplits = this.sumBaseParticipatingSplits();
-    const nextTotal = resolveSyncedConsumptionTotal(
+    const lockedSplitSum = this.sumLockedSplitAmounts();
+    const nextTotal = resolveSyncedConsumptionTotal({
       fromField,
       exclusiveSum,
-      fromSplits
+      lockedSplitSum,
+      anchored: this.totalAmountAnchored,
+    });
+
+    if (nextTotal === fromField) {
+      if (!this.totalAmountAnchored && nextTotal <= 0) {
+        const raw = this.advanceForm.value.totalAmount;
+        if (raw !== null && raw !== '') {
+          this.advanceForm.patchValue({ totalAmount: null }, { emitEvent: false });
+        }
+      }
+      return;
+    }
+
+    this.advanceForm.patchValue(
+      { totalAmount: nextTotal > 0 ? nextTotal : null },
+      { emitEvent: false }
     );
+  }
 
-    if (nextTotal === fromField) return;
-
-    this.advanceForm.patchValue({ totalAmount: nextTotal }, { emitEvent: false });
+  /** 手動鎖住的應付加總（未錨定時用來組成消費總額） */
+  private sumLockedSplitAmounts(): number {
+    return sumAmounts(
+      this.members
+        .filter((m) => !this.isSkipped(m.id) && this.splitLocked.has(m.id))
+        .map((m) => this.manualAmounts[m.id])
+    );
   }
 
   private sumExclusiveLineItems(): number {
-    return this.members
-      .filter((m) => !this.isSkipped(m.id))
-      .reduce(
-        (sum, m) =>
-          sum +
-          (this.memberItems[m.id] ?? []).reduce(
-            (itemSum, item) => itemSum + item.amount,
-            0
-          ),
-        0
-      );
+    return sumAmounts(
+      this.members
+        .filter((m) => !this.isSkipped(m.id))
+        .flatMap((m) => (this.memberItems[m.id] ?? []).map((item) => item.amount))
+    );
   }
 
   private computeChartBillTotal(): number | null {
@@ -1534,13 +1855,13 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       }
 
       const items = this.memberItems[m.id] ?? [];
-      const fromItems = items.reduce((sum, item) => sum + item.amount, 0);
+      const fromItems = sumAmounts(items.map((item) => item.amount));
 
       // 還沒填總額時，細項加總當底稿（由下往上）；有總額則保留 syncSplitAmounts 寫入的專屬＋共同
       const amount =
         items.length > 0 && anchoredTotal <= 0
           ? fromItems
-          : nextManual[m.id] ?? (items.length > 0 ? fromItems : 0);
+          : toAmount(nextManual[m.id] ?? (items.length > 0 ? fromItems : 0));
 
       baseSubtotals[m.id] = amount;
       nextManual[m.id] = amount;
@@ -1579,9 +1900,26 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       fee,
       payingIds,
       payerId,
-      this.remainderSeed
+      this.remainderSeed,
+      {
+        mode: this.serviceFeeSplitMode,
+        baseAmountsByMember: this.memberBaseSubtotals,
+      }
     );
     return Object.fromEntries(shares);
+  }
+
+  toggleServiceFeeSplitMode(): void {
+    this.serviceFeeSplitMode =
+      this.serviceFeeSplitMode === 'equal' ? 'proportional' : 'equal';
+    this.feeModeTick += 1;
+    this.refreshPreview({ syncSplits: true, syncPayers: true });
+  }
+
+  get serviceFeeSplitHint(): string {
+    return this.serviceFeeSplitMode === 'proportional'
+      ? this.create.serviceFeeHintProportional
+      : this.create.serviceFeeHintEqual;
   }
 
   private buildAdvanceInput(): CreateAdvanceInput {
@@ -1609,6 +1947,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       customInputMethod: inferred.customInputMethod,
       splitTotal: this.effectiveTotal,
       serviceFee: this.serviceFeeAmount() || null,
+      serviceFeeSplitMode: this.serviceFeeSplitMode,
       chartBillTotal: this.chartBillTotal,
       payers,
       members: this.members,
@@ -1666,12 +2005,16 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     const inferred = inferSplitRuleFromTransaction(tx);
     this.splitRule = inferred.splitRule;
     this.customInputMethod = inferred.customInputMethod;
+    this.serviceFeeSplitMode = normalizeServiceFeeSplitMode(
+      tx.serviceFeeSplitMode
+    );
     this.remainderSeed = tx.id;
     this.skippedMembers = new Set(
       tx.participants.filter((p) => p.amount === 0).map((p) => p.memberId)
     );
 
     const serviceFee = tx.serviceFee ?? 0;
+    const feeMode = this.serviceFeeSplitMode;
     const consumptionTotal =
       serviceFee > 0 ? Math.max(0, tx.totalAmount - serviceFee) : tx.totalAmount;
 
@@ -1682,6 +2025,7 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
       serviceFee: serviceFee > 0 ? serviceFee : null,
       billTotal: tx.billTotal ?? null,
     });
+    this.totalAmountAnchored = consumptionTotal > 0;
 
     this.payerRows = getAdvancePayers(tx).map((p) => ({
       memberId: p.memberId,
@@ -1718,7 +2062,8 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
               serviceFee,
               payingIds,
               tx.payerId,
-              tx.id
+              tx.id,
+              feeMode
             )
           : amounts;
     }
@@ -1729,12 +2074,26 @@ export class TransactionCreateComponent implements OnInit, OnDestroy, HasUnsaved
     this.applyParticipantMemberIds(participating);
     this.splitLocked.clear();
     this.splitAmountInputs = {};
+    this.noCommonShareMembers.clear();
     if (inferred.splitRule === 'custom') {
       for (const p of tx.participants) {
         if (p.amount > 0) {
           const baseAmount = this.manualAmounts[p.memberId] ?? p.amount;
           this.splitLocked.add(p.memberId);
           this.splitAmountInputs[p.memberId] = String(baseAmount);
+        }
+      }
+    }
+
+    // 推測免均分：專屬細項剛好等於應付（沒分到共同）
+    if (serviceFee <= 0) {
+      for (const p of tx.participants) {
+        if (p.amount <= 0) continue;
+        const exclusive = sumAmounts(
+          (this.memberItems[p.memberId] ?? []).map((item) => item.amount)
+        );
+        if (exclusive > 0 && exclusive === p.amount) {
+          this.noCommonShareMembers.add(p.memberId);
         }
       }
     }

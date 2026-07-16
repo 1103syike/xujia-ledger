@@ -1,6 +1,9 @@
 import { BalanceEdge, SettlementEntry, Transaction } from '../models';
 import { advanceMemberBalances, advanceSettlementEdges, getAdvancePayers } from '../transactions/advance-allocation';
-import { repaymentSignedImpact } from '../transactions/repayment-display';
+import {
+  inferRepaymentOwedBeforeFromParticipants,
+  repaymentSignedImpact,
+} from '../transactions/repayment-display';
 
 function edgeKey(from: string, to: string): string {
   return `${from}->${to}`;
@@ -274,7 +277,10 @@ export function oldestPairTransactionDate(
 }
 
 /**
- * 補齊舊還款資料缺少的 repaymentOwedBefore（用本筆之前的帳回推當時欠額）
+ * 補齊還款的 repaymentOwedBefore（凍結「當時」欠額，不要事後越算越大）：
+ * 1. 已存欄位 → 直接用
+ * 2. 否則從建立時 participants 反推（超額殘額形狀）
+ * 3. 再不行才用本筆之前的帳回推
  */
 export function enrichRepaymentOwedBefore(
   tx: Transaction,
@@ -282,11 +288,18 @@ export function enrichRepaymentOwedBefore(
 ): Transaction {
   if (tx.type !== 'repayment') return tx;
   if (tx.repaymentOwedBefore != null) return tx;
-  if (!allTransactions || !tx.fromMemberId) return tx;
+
+  const fromParticipants = inferRepaymentOwedBeforeFromParticipants(tx);
+  if (fromParticipants != null) {
+    return { ...tx, repaymentOwedBefore: fromParticipants };
+  }
+
+  if (!allTransactions || !tx.fromMemberId || !tx.createdAt) return tx;
 
   const earlier = allTransactions.filter(
     (other) =>
       other.id !== tx.id &&
+      !!other.createdAt &&
       (other.createdAt < tx.createdAt ||
         (other.createdAt === tx.createdAt && other.id < tx.id))
   );

@@ -119,6 +119,19 @@ export function diffAdvanceUpdate(
     );
   }
 
+  const feeModeLabel = (mode: string | null | undefined, fee: number | null) => {
+    if (fee == null || fee <= 0) return '—';
+    return mode === 'proportional' ? '照比例' : '均分';
+  };
+  const beforeFeeMode = feeModeLabel(
+    before.serviceFeeSplitMode,
+    beforeServiceFee
+  );
+  const afterFeeMode = feeModeLabel(after.serviceFeeSplitMode, afterServiceFee);
+  if (beforeFeeMode !== afterFeeMode) {
+    pushChange(changes, '服務費分攤', beforeFeeMode, afterFeeMode);
+  }
+
   const beforeNote = normalizeNote(before.note);
   const afterNote = normalizeNote(after.note);
   if (beforeNote !== afterNote) {

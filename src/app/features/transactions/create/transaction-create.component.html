@@ -23,7 +23,11 @@
         [class.create-submit-bar--keyboard]="isKeyboardOpen"
       >
         <div class="create-submit-bar__inner">
-          <div *ngIf="effectiveTotal > 0 || payerTotal > 0" class="advance-sticky-summary">
+          <div
+            *ngIf="effectiveTotal > 0 || payerTotal > 0"
+            class="advance-sticky-summary"
+            [attr.data-amount-pulse]="amountPulseOf('sticky')"
+          >
             <span>分攤 NT$ {{ stickySummary.splitTotal }}</span>
             <span class="advance-sticky-summary__sep">·</span>
             <span>實付 NT$ {{ stickySummary.grossPaid }}</span>
@@ -120,19 +124,29 @@
           <div class="create-quick-chips create-quick-chips--participants">
             <button
               type="button"
-              class="create-quick-chip"
+              class="create-quick-chip create-quick-chip--all"
               [class.create-quick-chip--active]="isAllGroupActive()"
               [attr.aria-pressed]="isAllGroupActive()"
+              [attr.data-pop]="
+                participantChipPopKey === 'all' ? participantChipPopTick : null
+              "
               (click)="selectAllParticipants()"
             >
               全家
             </button>
             <button
-              *ngFor="let m of members"
+              *ngFor="let m of members; let i = index"
               type="button"
               class="create-quick-chip"
               [class.create-quick-chip--active]="isMemberParticipating(m.id)"
               [attr.aria-pressed]="isMemberParticipating(m.id)"
+              [attr.data-pop]="
+                participantChipPopKey === m.id ? participantChipPopTick : null
+              "
+              [attr.data-cascade]="
+                participantChipPopKey === 'all' ? participantCascadeTick : null
+              "
+              [style.--cascade-i]="i"
               (click)="toggleParticipantMember(m.id)"
             >
               {{ m.name }}
@@ -167,28 +181,62 @@
           </div>
 
           <div class="create-amount-fields mt-3">
-            <div class="field-group">
+            <div
+              class="field-group"
+              [attr.data-amount-pulse]="amountPulseOf('total')"
+            >
               <label class="field-label">{{ create.consumptionTotal }}</label>
               <input
                 formControlName="totalAmount"
-                type="number"
+                type="text"
                 inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="off"
                 class="input input-amount"
+                [class.input-amount--suggested]="!isTotalAmountAnchored()"
+                [class.input-amount--manual]="isTotalAmountAnchored()"
                 placeholder="0"
-                (blur)="onSplitTotalCommit()"
+                (focus)="onTotalAmountFocus()"
+                (blur)="onTotalAmountBlur()"
+                (keydown.enter)="$any($event.target).blur()"
               />
+              <p class="create-section-hint mt-1 mb-0">{{ create.consumptionTotalHint }}</p>
             </div>
-            <div class="field-group">
+            <div
+              class="field-group"
+              [attr.data-amount-pulse]="amountPulseOf('fee')"
+            >
               <label class="field-label">{{ create.serviceFee }}</label>
               <input
                 formControlName="serviceFee"
-                type="number"
+                type="text"
                 inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="off"
                 class="input input-amount"
+                [class.input-amount--suggested]="!isServiceFeeManual()"
+                [class.input-amount--manual]="isServiceFeeManual()"
                 placeholder="0"
-                (blur)="onSplitTotalCommit()"
+                (blur)="onSplitTotalCommit('fee')"
+                (keydown.enter)="$any($event.target).blur()"
               />
-              <p class="caption-text mt-1">{{ create.serviceFeeHint }}</p>
+              <button
+                type="button"
+                class="service-fee-mode-toggle"
+                [class.service-fee-mode-toggle--proportional]="
+                  serviceFeeSplitMode === 'proportional'
+                "
+                [attr.data-pop]="feeModeTick > 0 ? feeModeTick : null"
+                (click)="toggleServiceFeeSplitMode()"
+              >
+                <span class="service-fee-mode-toggle__icon" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </span>
+                <span
+                  class="service-fee-mode-toggle__label"
+                  [attr.data-tick]="feeModeTick > 0 ? feeModeTick : null"
+                >{{ serviceFeeSplitHint }}</span>
+              </button>
             </div>
           </div>
 
@@ -201,6 +249,7 @@
               *ngFor="let m of visibleSplitMembers"
               class="itemized-member-card"
               [class.itemized-member-card--skipped]="isSkipped(m.id)"
+              [class.itemized-member-card--no-common]="isNoCommonShare(m.id)"
             >
               <div class="itemized-member-card__head">
                 <div class="flex min-w-0 items-center gap-2">
@@ -212,35 +261,85 @@
                   <ng-container *ngIf="isSkipped(m.id)">
                     <span class="itemized-member-card__allocated-value">沒參與</span>
                   </ng-container>
-                  <ng-container *ngIf="!isSkipped(m.id) && memberHasLineItems(m.id)">
-                    <span class="itemized-member-card__allocated-value">NT$ {{ memberSubtotals[m.id] || 0 }}</span>
+                  <ng-container *ngIf="!isSkipped(m.id) && showsAllocatedTotal(m.id)">
+                    <span
+                      class="itemized-member-card__allocated-value"
+                      [class.itemized-member-card__allocated-value--manual]="
+                        memberHasLineItems(m.id)
+                      "
+                      [class.itemized-member-card__allocated-value--auto]="
+                        !memberHasLineItems(m.id)
+                      "
+                    >
+                      NT$ {{ memberSubtotals[m.id] || 0 }}
+                    </span>
                   </ng-container>
-                  <ng-container *ngIf="!isSkipped(m.id) && !memberHasLineItems(m.id)">
+                  <ng-container *ngIf="!isSkipped(m.id) && !showsAllocatedTotal(m.id)">
                     <input
-                      type="number"
+                      type="text"
                       inputmode="numeric"
+                      pattern="[0-9]*"
+                      autocomplete="off"
                       class="input-sm input-amount w-24 text-right"
                       [class.input-amount--suggested]="!isSplitAmountLocked(m.id)"
                       [class.input-amount--manual]="isSplitAmountLocked(m.id)"
+                      [attr.data-amount-pulse]="amountPulseOf('split:' + m.id)"
                       [ngModel]="splitAmountDisplay(m.id)"
                       [ngModelOptions]="{ standalone: true }"
                       placeholder="0"
                       (ngModelChange)="setSplitAmount(m.id, $event)"
+                      (focus)="focusSplitAmount(m.id)"
                       (blur)="commitSplitAmount(m.id)"
+                      (keydown.enter)="$any($event.target).blur()"
                     />
                   </ng-container>
                 </div>
               </div>
 
               <ng-container *ngIf="!isSkipped(m.id)">
-                <div *ngIf="(memberItems[m.id] ?? []).length > 0" class="itemized-member-card__items">
+                <!-- 無細項但有服務費時，仍可調基礎消費金額 -->
+                <div
+                  *ngIf="!memberHasLineItems(m.id) && memberServiceFeeShare(m.id) > 0 && consumptionSubtotal() > 0"
+                  class="itemized-member-card__base-edit mt-2"
+                >
+                  <span class="caption-text">基礎消費</span>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="off"
+                    class="input-sm input-amount w-24 text-right"
+                    [class.input-amount--suggested]="!isSplitAmountLocked(m.id)"
+                    [class.input-amount--manual]="isSplitAmountLocked(m.id)"
+                    [attr.data-amount-pulse]="amountPulseOf('split:' + m.id)"
+                    [ngModel]="splitAmountDisplay(m.id)"
+                    [ngModelOptions]="{ standalone: true }"
+                    placeholder="0"
+                    (ngModelChange)="setSplitAmount(m.id, $event)"
+                    (focus)="focusSplitAmount(m.id)"
+                    (blur)="commitSplitAmount(m.id)"
+                    (keydown.enter)="$any($event.target).blur()"
+                  />
+                </div>
+
+                <div *ngIf="hasMemberBreakdown(m.id)" class="itemized-member-card__items">
                   <div
                     *ngFor="let item of memberItems[m.id] ?? []; let i = index"
                     class="itemized-member-card__item-row"
+                    [class.itemized-member-card__item-row--slaying]="isSlayingItem(m.id, i)"
+                    [attr.data-enter]="
+                      isJustAddedItem(m.id, i) ? lastAddedItemTick : null
+                    "
+                    [attr.data-slay]="isSlayingItem(m.id, i) ? '' : null"
                   >
                     <span class="min-w-0 flex-1 truncate">{{ item.note }}</span>
                     <span class="shrink-0 font-medium">NT$ {{ item.amount }}</span>
-                    <button type="button" class="caption-text shrink-0 text-coral" (click)="removeMemberItem(m.id, i)">移除</button>
+                    <button
+                      type="button"
+                      class="caption-text shrink-0 text-coral"
+                      [disabled]="!!slayingItemKey"
+                      (click)="removeMemberItem(m.id, i)"
+                    >移除</button>
                   </div>
                   <div
                     *ngIf="memberCommonShare(m.id) > 0"
@@ -249,15 +348,60 @@
                     <span class="min-w-0 flex-1 truncate">共同消費</span>
                     <span class="shrink-0 font-medium">NT$ {{ memberCommonShare(m.id) }}</span>
                   </div>
+                  <div
+                    *ngIf="memberServiceFeeShare(m.id) > 0"
+                    class="itemized-member-card__item-row itemized-member-card__item-row--shared"
+                  >
+                    <span class="min-w-0 flex-1 truncate">服務費</span>
+                    <span class="shrink-0 font-medium">NT$ {{ memberServiceFeeShare(m.id) }}</span>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  class="itemized-member-card__add-btn"
-                  (click)="toggleAddItem(m.id)"
-                >
-                  {{ addingItemFor === m.id ? '收起' : '＋ 新增品項' }}
-                </button>
+                <div class="itemized-member-card__actions">
+                  <button
+                    type="button"
+                    class="itemized-member-card__common-btn"
+                    [class.itemized-member-card__common-btn--off]="isNoCommonShare(m.id)"
+                    [attr.aria-pressed]="isNoCommonShare(m.id)"
+                    [attr.title]="split.noCommonShareHint"
+                    [attr.data-pop]="
+                      commonSharePopFor === m.id && commonShareTick > 0
+                        ? commonShareTick
+                        : null
+                    "
+                    (click)="toggleNoCommonShare(m.id)"
+                  >
+                    <span
+                      class="itemized-member-card__common-label"
+                      [attr.data-tick]="
+                        commonSharePopFor === m.id && commonShareTick > 0
+                          ? commonShareTick
+                          : null
+                      "
+                    >
+                      {{ isNoCommonShare(m.id) ? split.noCommonShare : split.sharesCommon }}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="itemized-member-card__add-btn"
+                    [class.itemized-member-card__add-btn--open]="addingItemFor === m.id"
+                    [attr.data-pop]="
+                      addItemPopFor === m.id && addItemTick > 0 ? addItemTick : null
+                    "
+                    (click)="toggleAddItem(m.id)"
+                  >
+                    <span class="itemized-member-card__add-icon" aria-hidden="true"></span>
+                    <span
+                      class="itemized-member-card__add-label"
+                      [attr.data-tick]="
+                        addItemPopFor === m.id && addItemTick > 0 ? addItemTick : null
+                      "
+                    >
+                      {{ addingItemFor === m.id ? '收起' : '新增品項' }}
+                    </span>
+                  </button>
+                </div>
 
                 <div *ngIf="addingItemFor === m.id" class="itemized-member-card__add-form">
                   <input
@@ -267,8 +411,10 @@
                     placeholder="品項名稱"
                   />
                   <input
-                    type="number"
+                    type="text"
                     inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="off"
                     class="input-sm input-amount w-20 shrink-0 text-right"
                     [(ngModel)]="memberDrafts[m.id].amount"
                     [ngModelOptions]="{ standalone: true }"
@@ -294,79 +440,63 @@
         <div id="payer-section" class="card-stack">
           <p class="card-title">{{ create.whoPays }}</p>
           <p class="create-section-hint">{{ create.whoPaysHint }}</p>
-          <div class="mb-2 flex items-center justify-end gap-2">
+
+          <div class="payer-pick" role="group" [attr.aria-label]="create.whoPays">
             <button
-              *ngIf="payerRows.length === 1"
+              *ngFor="let m of members"
               type="button"
-              class="btn-secondary btn-sm"
-              (click)="addPayer()"
+              class="payer-pick__tile"
+              [class.payer-pick__tile--on]="isPayer(m.id)"
+              [attr.aria-pressed]="isPayer(m.id)"
+              [attr.data-pop]="
+                payerChipPopKey === m.id ? payerChipPopTick : null
+              "
+              (click)="togglePayerMember(m.id)"
             >
-              ＋ 多人付款
+              <span class="payer-pick__avatar-wrap">
+                <app-member-avatar [member]="m" size="md" />
+                <span *ngIf="isPayer(m.id)" class="payer-pick__dot" aria-hidden="true"></span>
+              </span>
+              <span class="payer-pick__name">{{ m.name }}</span>
             </button>
           </div>
 
-          <ng-container *ngIf="payerRows.length === 1">
-            <app-member-select-grid
-              label="付款人"
-              [members]="members"
-              [value]="payerRows[0].memberId"
-              (valueChange)="selectPrimaryPayer($event)"
-            />
-            <div class="payer-amount-row">
-              <div class="field-group min-w-0 flex-1">
-                <label class="field-label">實付金額</label>
+          <div *ngIf="orderedPayerMembers.length > 0" class="payer-amounts">
+            <p class="payer-amounts__label">實付金額</p>
+            <div
+              *ngFor="let m of orderedPayerMembers"
+              class="payer-amounts__row"
+              [attr.data-enter]="
+                payerChipPopKey === m.id ? payerChipPopTick : null
+              "
+            >
+              <span class="payer-amounts__name">{{ m.name }}</span>
+              <div
+                class="payer-amounts__field"
+                [attr.data-amount-pulse]="amountPulseOf('payer:' + m.id)"
+              >
+                <span class="payer-amounts__currency" aria-hidden="true">NT$</span>
                 <input
-                  type="number"
+                  [id]="'payer-amount-' + m.id"
+                  type="text"
                   inputmode="numeric"
-                  class="input input-amount"
-                  [class.input-amount--suggested]="!payerRows[0].locked"
-                  [class.input-amount--manual]="payerRows[0].locked"
-                  [ngModel]="payerRows[0].amount"
+                  pattern="[0-9]*"
+                  autocomplete="off"
+                  class="payer-amounts__input input-amount"
+                  [class.input-amount--suggested]="!isPayerAmountLocked(m.id)"
+                  [class.input-amount--manual]="isPayerAmountLocked(m.id)"
+                  [attr.aria-label]="m.name + ' 實付金額'"
+                  [ngModel]="payerAmountOf(m.id)"
                   [ngModelOptions]="{ standalone: true }"
                   placeholder="0"
-                  (ngModelChange)="setPayerAmount(0, $event)"
-                  (blur)="commitPayerAmount(0)"
+                  (ngModelChange)="setPayerAmountByMember(m.id, $event)"
+                  (focus)="focusPayerAmount(m.id)"
+                  (blur)="commitPayerAmountByMember(m.id)"
+                  (keydown.enter)="$any($event.target).blur()"
                 />
               </div>
             </div>
-          </ng-container>
-
-          <ng-container *ngIf="payerRows.length > 1">
-            <div *ngFor="let row of payerRows; let i = index; trackBy: trackPayerRowByIndex" class="mb-3">
-              <app-member-select-grid
-                [label]="'付款人 ' + (i + 1)"
-                [members]="members"
-                [value]="row.memberId"
-                [disabledIds]="disabledPayerIdsForRow(i)"
-                (valueChange)="setPayerMember(i, $event)"
-              />
-              <div class="payer-amount-row">
-                <div class="field-group min-w-0 flex-1">
-                  <label class="field-label">實付金額</label>
-                  <input
-                    type="number"
-                    inputmode="numeric"
-                    class="input input-amount"
-                    [class.input-amount--suggested]="!row.locked"
-                    [class.input-amount--manual]="row.locked"
-                    [ngModel]="row.amount"
-                    [ngModelOptions]="{ standalone: true }"
-                    placeholder="0"
-                    (ngModelChange)="setPayerAmount(i, $event)"
-                    (blur)="commitPayerAmount(i)"
-                  />
-                </div>
-                <button
-                  type="button"
-                  class="caption-text mb-2 shrink-0 text-coral"
-                  (click)="removePayer(i)"
-                >
-                  移除
-                </button>
-              </div>
-            </div>
-            <button type="button" class="btn-secondary btn-sm w-full" (click)="addPayer()">＋ 新增付款人</button>
-          </ng-container>
+          </div>
         </div>
 
         <p *ngIf="error" class="body-text text-center text-coral">{{ error }}</p>
@@ -410,8 +540,10 @@
               <label class="field-label">還款金額</label>
               <input
                 formControlName="amount"
-                type="number"
+                type="text"
                 inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="off"
                 class="input input-amount"
                 [placeholder]="repaymentBalance ? 'NT$ ' + repaymentBalance : '0'"
               />

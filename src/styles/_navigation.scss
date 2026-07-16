@@ -49,7 +49,16 @@
   text-decoration: none;
   color: color-mix(in srgb, var(--color-text) 70%, transparent);
   --motion-press-scale: 0.9;
-  transition: color var(--duration-fast) var(--ease-default);
+  transform-origin: center;
+  transition:
+    color var(--duration-fast) var(--ease-default),
+    transform var(--motion-duration-press) var(--motion-ease-press),
+    opacity var(--motion-duration-press) var(--motion-ease-press);
+
+  &:active {
+    transform: scale(var(--motion-press-scale));
+    opacity: var(--motion-press-opacity);
+  }
 }
 
 .bottom-nav__ripple {
@@ -158,6 +167,11 @@
     0 3px 8px color-mix(in srgb, var(--theme-ink) 10%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--ds-white) 35%, transparent);
   --motion-press-scale: 0.94;
+  transform-origin: center;
+  transition:
+    transform var(--motion-duration-press) var(--motion-ease-press),
+    opacity var(--motion-duration-press) var(--motion-ease-press),
+    box-shadow var(--motion-duration-press) var(--motion-ease-press);
   animation: record-fab-enter 0.45s var(--motion-ease-spring) both;
 
   &::after {
@@ -174,6 +188,8 @@
   }
 
   &:active {
+    transform: scale(var(--motion-press-scale));
+    opacity: var(--motion-press-opacity);
     box-shadow:
       0 5px 14px color-mix(in srgb, var(--theme-coral) 28%, transparent),
       0 2px 5px color-mix(in srgb, var(--theme-ink) 8%, transparent),

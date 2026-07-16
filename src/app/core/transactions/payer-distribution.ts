@@ -1,3 +1,5 @@
+import { toAmount } from '../../shared/utils/amount';
+
 /** 單一付款列狀態（供分配演算法使用） */
 export interface PayerAmountRow {
   amount: number;
@@ -29,9 +31,10 @@ export function distributePayerAmounts(
 ): number[] {
   const n = rows.length;
   if (n === 0) return [];
-  if (splitTotal <= 0) return rows.map(() => 0);
+  const total = toAmount(splitTotal);
+  if (total <= 0) return rows.map(() => 0);
 
-  const amounts = rows.map((r) => (r.locked ? Math.max(0, r.amount) : 0));
+  const amounts = rows.map((r) => (r.locked ? toAmount(r.amount) : 0));
   const lockedSum = amounts.reduce((sum, value) => sum + value, 0);
   const unlockedIndices = rows
     .map((row, index) => (!row.locked ? index : -1))
@@ -41,7 +44,7 @@ export function distributePayerAmounts(
     return amounts;
   }
 
-  let remainder = splitTotal - lockedSum;
+  let remainder = total - lockedSum;
   if (remainder < 0) remainder = 0;
 
   const parts = splitEqually(remainder, unlockedIndices.length);

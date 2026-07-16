@@ -16,16 +16,11 @@
   padding: var(--input-padding-y) var(--input-padding-x);
   font-size: var(--font-size-base);
   color: var(--color-text);
-  outline: none;
-  transition: border-color var(--duration-fast) var(--ease-default);
   @include border-input;
+  @include input-field-motion;
 
   @media (min-width: 768px) {
     font-size: var(--font-size-sm);
-  }
-
-  &:focus {
-    @include focus-border;
   }
 }
 
@@ -35,16 +30,11 @@
   padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-base);
   color: var(--color-text);
-  outline: none;
-  transition: border-color var(--duration-fast) var(--ease-default);
   @include border-input;
+  @include input-field-motion;
 
   @media (min-width: 768px) {
     font-size: var(--font-size-sm);
-  }
-
-  &:focus {
-    @include focus-border;
   }
 }
 
@@ -68,18 +58,11 @@
   text-align: left;
   color: inherit;
   cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-default),
-    transform var(--duration-fast) var(--ease-default);
   @include border-input;
+  @include input-field-motion;
 
   &:focus-visible {
-    @include focus-border;
     outline: none;
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.995);
   }
 
   &:disabled {
@@ -515,4 +498,20 @@ app-member-avatar {
 
 .login-member-card--recent {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ds-lavender) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .input-sm,
+  .textarea,
+  .date-field {
+    transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+
+    &:hover:not(:disabled):not(:focus):not(:focus-visible),
+    &:focus,
+    &:focus-visible,
+    &:active:not(:disabled) {
+      transform: none;
+    }
+  }
 }

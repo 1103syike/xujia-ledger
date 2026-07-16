@@ -47,14 +47,11 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-link);
   background: transparent;
-  transition: opacity var(--duration-fast) var(--ease-default);
-
-  &:active {
-    opacity: 0.72;
-  }
+  @include press-scale(0.96);
 
   &:disabled {
     @include disabled-state;
+    transform: none;
   }
 }
 
@@ -65,14 +62,11 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-link);
-  transition: transform var(--duration-fast) var(--ease-default);
-
-  &:active {
-    transform: scale(0.99);
-  }
+  @include press-scale(0.97);
 
   &:disabled {
     @include disabled-state;
+    transform: none;
   }
 }
 

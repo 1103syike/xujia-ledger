@@ -15,8 +15,10 @@ export interface CreateFormSnapshot {
     date: string;
     totalAmount: number | null;
     serviceFee: number | null;
+    serviceFeeSplitMode: 'equal' | 'proportional';
     billTotal: number | null;
     skippedMembers: string[];
+    noCommonShareMembers: string[];
     memberItems: Record<string, LineItem[]>;
     manualAmounts: Record<string, number>;
     splitAmountInputs: Record<string, string>;
@@ -69,8 +71,10 @@ export function serializeCreateFormSnapshot(
       date: snapshot.advance.date,
       totalAmount: snapshot.advance.totalAmount,
       serviceFee: snapshot.advance.serviceFee,
+      serviceFeeSplitMode: snapshot.advance.serviceFeeSplitMode,
       billTotal: snapshot.advance.billTotal,
       skippedMembers: sortStrings(snapshot.advance.skippedMembers),
+      noCommonShareMembers: sortStrings(snapshot.advance.noCommonShareMembers),
       memberItems: normalizeLineItems(snapshot.advance.memberItems),
       manualAmounts: sortRecord(snapshot.advance.manualAmounts),
       splitAmountInputs: sortRecord(snapshot.advance.splitAmountInputs),

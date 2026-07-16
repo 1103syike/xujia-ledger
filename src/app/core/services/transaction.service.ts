@@ -143,6 +143,10 @@ export class TransactionService implements OnDestroy {
       totalAmount: input.totalAmount,
       billTotal: input.billTotal ?? null,
       serviceFee: input.serviceFee ?? null,
+      serviceFeeSplitMode:
+        input.serviceFee && input.serviceFee > 0
+          ? input.serviceFeeSplitMode ?? 'equal'
+          : null,
       payerId: primaryPayerId(payers),
       payers,
       changeAmount: advanceChangeAmount(payers, input.totalAmount) || null,
@@ -256,6 +260,10 @@ export class TransactionService implements OnDestroy {
       totalAmount: input.totalAmount,
       billTotal: input.billTotal ?? null,
       serviceFee: input.serviceFee ?? null,
+      serviceFeeSplitMode:
+        input.serviceFee && input.serviceFee > 0
+          ? input.serviceFeeSplitMode ?? 'equal'
+          : null,
       payerId: primaryPayerId(payers),
       payers,
       changeAmount: advanceChangeAmount(payers, input.totalAmount) || null,

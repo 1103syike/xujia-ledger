@@ -39,4 +39,21 @@ describe('distributeHybridSplitAmounts', () => {
   it('splits entire total when nobody has exclusive items', () => {
     expect(distributeHybridSplitAmounts(521, [0, 0])).toEqual([261, 260]);
   });
+
+  it('免均分：有專屬者不進共同（兩盒泡芙）', () => {
+    // 總額 600；A 專屬一盒 300 免均分；BCD 分另一盒 300
+    expect(
+      distributeHybridSplitAmounts(
+        600,
+        [300, 0, 0, 0],
+        [false, true, true, true]
+      )
+    ).toEqual([300, 100, 100, 100]);
+  });
+
+  it('免均分且無專屬 → 應付 0', () => {
+    expect(
+      distributeHybridSplitAmounts(300, [0, 0, 0], [false, true, true])
+    ).toEqual([0, 150, 150]);
+  });
 });

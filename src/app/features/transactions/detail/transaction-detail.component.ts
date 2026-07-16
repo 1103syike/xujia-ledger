@@ -9,11 +9,10 @@ import { SplitPieChartComponent } from '../../../shared/components/ledger/split-
 import { ConfirmDialogComponent } from '../../../shared/components/form/confirm-dialog.component';
 import { TransactionDatePipe } from '../../../shared/pipes/transaction-date.pipe';
 import { transactionTypeLabel } from '../../../core/transactions/transaction-date';
-import { formatOweAmount, formatOwedAmount } from '../../../core/ledger/settlement-display';
+import { formatOweAmount } from '../../../core/ledger/settlement-display';
 import { participantLineItemsWithChange } from '../../../core/transactions/advance-display';
 import { formatTransactionStoryLine } from '../../../core/transactions/transaction-summary';
-import { getAdvancePayers, memberNetDisplayAmount, advanceChangeShareByMember } from '../../../core/transactions/advance-allocation';
-import { memberNetRowsForTransaction } from '../../../core/transactions/transaction-member-nets';
+import { getAdvancePayers, advanceChangeShareByMember } from '../../../core/transactions/advance-allocation';
 import { formatRepaymentTitle } from '../../../core/transactions/repayment-display';
 import { enrichRepaymentOwedBefore } from '../../../core/ledger/ledger-calculator';
 import { LineItem, Transaction, TransactionParticipant, TransferEdge } from '../../../core/models';
@@ -131,6 +130,11 @@ export class TransactionDetailComponent {
     return formatRepaymentTitle(enrichRepaymentOwedBefore(tx, activeList));
   }
 
+  /** 每人多少：只列有分到的人，不用分的不顯示 */
+  splitParticipants(tx: Transaction): TransactionParticipant[] {
+    return tx.participants.filter((p) => p.amount > 0);
+  }
+
   owingParticipants(tx: Transaction): TransactionParticipant[] {
     const payerIds = new Set(getAdvancePayers(tx).map((p) => p.memberId));
     return tx.participants.filter(
@@ -155,20 +159,6 @@ export class TransactionDetailComponent {
 
   formatOwe(amount: number): string {
     return formatOweAmount(amount);
-  }
-
-  formatOwed(amount: number): string {
-    return formatOwedAmount(amount);
-  }
-
-  memberNet(tx: Transaction, memberId: string): number {
-    return (
-      memberNetRowsForTransaction(tx).find((r) => r.memberId === memberId)?.net ?? 0
-    );
-  }
-
-  memberDisplayNet(tx: Transaction, memberId: string): number {
-    return memberNetDisplayAmount(tx, memberId);
   }
 
   payerChangeShare(tx: Transaction, memberId: string): number | null {

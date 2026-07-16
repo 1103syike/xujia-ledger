@@ -6,7 +6,10 @@ import {
 } from '../models';
 import { COPY_ERRORS } from '../../copy';
 import { primaryPayerId, validateAdvancePayers } from '../transactions/advance-allocation';
-import { applyServiceFeeToSplitPreview } from './service-fee-split';
+import {
+  applyServiceFeeToSplitPreview,
+  normalizeServiceFeeSplitMode,
+} from './service-fee-split';
 
 export interface SplitPreviewLine {
   memberId: string;
@@ -203,7 +206,8 @@ export function buildSplitPreview(
       serviceFee,
       payingIds,
       primaryPayer,
-      seed
+      seed,
+      normalizeServiceFeeSplitMode(input.serviceFeeSplitMode)
     );
   }
 

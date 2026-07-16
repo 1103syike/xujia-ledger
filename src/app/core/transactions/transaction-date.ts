@@ -65,6 +65,7 @@ interface LegacyExpenseDoc {
   totalAmount: number;
   billTotal?: number | null;
   serviceFee?: number | null;
+  serviceFeeSplitMode?: Transaction['serviceFeeSplitMode'];
   payerId: string;
   participantScope?: Transaction['participantScope'];
   participantIds?: string[];
@@ -80,12 +81,30 @@ interface LegacyExpenseDoc {
   participants?: TransactionParticipant[];
   type?: Transaction['type'];
   fromMemberId?: string | null;
+  repaymentOwedBefore?: number | null;
   accountId?: string;
   sourceTransactionIds?: string[];
   transferEdges?: Transaction['transferEdges'];
   settledByTransferId?: string | null;
   payers?: Transaction['payers'];
   changeAmount?: number | null;
+}
+
+/** Firestore Timestamp／ISO 字串都收成 ISO，給還款凍結結算用 */
+export function coerceIsoTimestamp(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const withToDate = value as { toDate?: () => Date };
+    if (typeof withToDate.toDate === 'function') {
+      return withToDate.toDate().toISOString();
+    }
+    const seconds = (value as { seconds?: number }).seconds;
+    if (typeof seconds === 'number') {
+      const nanos = (value as { nanoseconds?: number }).nanoseconds ?? 0;
+      return new Date(seconds * 1000 + nanos / 1e6).toISOString();
+    }
+  }
+  return '';
 }
 
 function legacySplitsToParticipants(
@@ -109,6 +128,9 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
   const status =
     raw.status === 'cancelled' || raw.status === 'void' ? 'void' : 'active';
 
+  const createdAt = coerceIsoTimestamp(raw.createdAt);
+  const updatedAt = coerceIsoTimestamp(raw.updatedAt) || createdAt;
+
   if (type === 'repayment') {
     return {
       id: raw.id,
@@ -119,11 +141,12 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
       totalAmount: raw.totalAmount,
       payerId: raw.payerId,
       fromMemberId: raw.fromMemberId ?? null,
+      repaymentOwedBefore: raw.repaymentOwedBefore ?? null,
       note: raw.note ?? null,
       status,
       createdBy: raw.createdBy,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
+      createdAt,
+      updatedAt,
       participants: raw.participants ?? [
         {
           memberId: raw.fromMemberId ?? '',
@@ -152,8 +175,8 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
       note: raw.note ?? null,
       status,
       createdBy: raw.createdBy,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
+      createdAt,
+      updatedAt,
       participants: raw.participants ?? [],
       sourceTransactionIds: raw.sourceTransactionIds,
       transferEdges: raw.transferEdges,
@@ -174,6 +197,8 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     totalAmount: raw.totalAmount,
     billTotal: raw.billTotal ?? null,
     serviceFee: raw.serviceFee ?? null,
+    serviceFeeSplitMode:
+      raw.serviceFeeSplitMode === 'proportional' ? 'proportional' : raw.serviceFee ? 'equal' : null,
     payerId: raw.payerId,
     payers: raw.payers,
     changeAmount: raw.changeAmount ?? null,
@@ -185,8 +210,8 @@ export function normalizeTransaction(raw: LegacyExpenseDoc): Transaction {
     remainderAmount: raw.remainderAmount,
     status,
     createdBy: raw.createdBy,
-    createdAt: raw.createdAt,
-    updatedAt: raw.updatedAt,
+    createdAt,
+    updatedAt,
     participants,
     settledByTransferId: raw.settledByTransferId ?? null,
   };

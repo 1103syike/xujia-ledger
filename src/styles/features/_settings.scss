@@ -106,6 +106,15 @@
   text-align: left;
   color: inherit;
   cursor: pointer;
+  transform-origin: center;
+  transition:
+    transform var(--motion-duration-press) var(--motion-ease-press),
+    opacity var(--motion-duration-press) var(--motion-ease-press);
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+    opacity: var(--motion-press-opacity);
+  }
 }
 
 .settings-about__version {

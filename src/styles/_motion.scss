@@ -152,6 +152,37 @@
   --motion-press-scale: 0.98;
 }
 
+/**
+ * 全域點擊回饋：所有可點 button／role=button／主要 CTA 連結
+ * 用 .motion-press-none 排除特例
+ */
+button:not(:disabled):not([aria-disabled='true']):not(.motion-press-none),
+[role='button']:not([aria-disabled='true']):not(.motion-press-none),
+a.btn-primary:not(.motion-press-none),
+a.btn-secondary:not(.motion-press-none),
+a.btn-danger:not(.motion-press-none),
+a.btn-ghost:not(.motion-press-none),
+a.btn-sm:not(.motion-press-none),
+a.back-link:not(.motion-press-none),
+a.record-fab:not(.motion-press-none),
+.bottom-nav__link:not(.motion-press-none) {
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  transition:
+    transform var(--motion-duration-press) var(--motion-ease-press),
+    opacity var(--motion-duration-press) var(--motion-ease-press),
+    background-color var(--motion-duration-press) var(--motion-ease-press),
+    border-color var(--motion-duration-press) var(--motion-ease-press),
+    box-shadow var(--motion-duration-press) var(--motion-ease-press),
+    color var(--motion-duration-press) var(--motion-ease-press),
+    filter var(--motion-duration-press) var(--motion-ease-press);
+
+  &:active {
+    transform: scale(var(--motion-press-scale));
+    opacity: var(--motion-press-opacity);
+  }
+}
+
 /* Overlay + panel (CSS fallback; Angular animations preferred for leave) */
 .motion-overlay {
   animation: motion-fade-in var(--motion-duration-overlay) var(--motion-ease-out);

@@ -90,6 +90,7 @@ export interface BuildAdvanceInputParams {
   splitTotal: number;
   chartBillTotal: number | null;
   serviceFee?: number | null;
+  serviceFeeSplitMode?: 'equal' | 'proportional' | null;
   consumptionTotal?: number | null;
   payers: AdvancePayer[];
   members: Member[];
@@ -117,6 +118,7 @@ export function buildAdvanceInputFromDraft(
     totalAmount: params.splitTotal,
     billTotal: params.chartBillTotal,
     serviceFee: params.serviceFee ?? null,
+    serviceFeeSplitMode: params.serviceFeeSplitMode ?? 'equal',
     payerId: params.payers[0]?.memberId ?? '',
     payers: params.payers,
     participantScope: 'all',

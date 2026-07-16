@@ -7,6 +7,35 @@ export type RepaymentNetRow = {
   net: number;
 };
 
+/**
+ * 從建立時寫入的 participants 反推當時欠額（超額：付款人 signed 為正殘額）。
+ * 避免讀庫漏掉 repaymentOwedBefore 後，又用「之後的帳」重算。
+ */
+export function inferRepaymentOwedBeforeFromParticipants(
+  tx: Transaction
+): number | null {
+  if (tx.type !== 'repayment' || !tx.fromMemberId) return null;
+
+  const from = tx.participants.find((p) => p.memberId === tx.fromMemberId);
+  const to = tx.participants.find((p) => p.memberId === tx.payerId);
+  if (!from || !to) return null;
+
+  const fromSigned = from.signedAmount;
+  const toSigned = to.signedAmount;
+  if (fromSigned == null || toSigned == null) return null;
+
+  // 超額形狀：付款人變債主（+殘額）、收款人變丐幫（−殘額）
+  if (
+    fromSigned > 0 &&
+    toSigned === -fromSigned &&
+    fromSigned < tx.totalAmount
+  ) {
+    return tx.totalAmount - fromSigned;
+  }
+
+  return null;
+}
+
 /** 還款金額是否超過當下欠額 */
 export function isRepaymentOverpay(tx: Transaction): boolean {
   if (tx.type !== 'repayment') return false;

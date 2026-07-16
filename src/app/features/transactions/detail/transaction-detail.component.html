@@ -16,7 +16,11 @@
             <p class="helper-text mt-1">
               {{ tx | transactionDate }}
               <span *ngIf="storyLine(tx, vm.activeList)"> · {{ storyLine(tx, vm.activeList) }}</span>
-              <span *ngIf="tx.serviceFee"> · 服務費 NT$ {{ tx.serviceFee }}</span>
+              <span *ngIf="tx.serviceFee">
+                · 服務費 NT$ {{ tx.serviceFee }}（{{
+                  tx.serviceFeeSplitMode === 'proportional' ? '照比例' : '均分'
+                }}）
+              </span>
             </p>
           </div>
           <p class="amount-lg shrink-0">NT$ {{ tx.totalAmount }}</p>
@@ -67,9 +71,8 @@
 
         <ng-container *ngIf="splitView === 'detail'">
           <div
-            *ngFor="let p of tx.participants"
+            *ngFor="let p of splitParticipants(tx)"
             class="inset-panel mt-3"
-            [class.opacity-60]="p.amount === 0"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="flex items-center gap-2 body-text">
@@ -80,19 +83,10 @@
                 </ng-container>
               </div>
               <div class="text-right">
-                <p *ngIf="p.amount === 0 && !isAdvancePayer(tx, p.memberId)" class="caption-text">{{ terms.noSplit }}</p>
-                <ng-container *ngIf="memberDisplayNet(tx, p.memberId) as net">
-                  <p
-                    *ngIf="net !== 0"
-                    class="text-base font-bold tabular-nums"
-                    [class.text-debt]="net < 0"
-                    [class.text-positive]="net > 0"
-                  >
-                    <ng-container *ngIf="net < 0">{{ formatOwe(-net) }}</ng-container>
-                    <ng-container *ngIf="net > 0">+{{ formatOwed(net) }}</ng-container>
-                  </p>
-                  <p *ngIf="net === 0 && isAdvancePayer(tx, p.memberId)" class="caption-text">無需收回</p>
-                </ng-container>
+                <!-- 每人多少：秀分攤總和（= 細項加總），不是結算淨額 -->
+                <p class="text-base font-bold tabular-nums">
+                  NT$ {{ p.amount }}
+                </p>
                 <span
                   *ngIf="payerChangeShare(tx, p.memberId) as changeShare"
                   class="chip ml-1 bg-mint/20 text-positive text-xs"

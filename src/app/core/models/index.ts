@@ -84,8 +84,10 @@ export interface Transaction {
   date?: string;
   totalAmount: number;
   billTotal?: number | null;
-  /** 服務費（均分給參與成員，已含在 totalAmount） */
+  /** 服務費（已含在 totalAmount） */
   serviceFee?: number | null;
+  /** 服務費分攤：equal 均分（預設）／proportional 依基礎消費比例 */
+  serviceFeeSplitMode?: 'equal' | 'proportional' | null;
   /** 代墊者（advance）或還款收款人（repayment）；相容舊資料，為第一位代墊者 */
   payerId: string;
   /** 多位代墊者與各自代墊金額 */
@@ -145,8 +147,10 @@ export interface CreateAdvanceInput {
   date: string;
   totalAmount: number;
   billTotal?: number | null;
-  /** 服務費（均分給參與成員，已含在 totalAmount） */
+  /** 服務費（已含在 totalAmount） */
   serviceFee?: number | null;
+  /** 服務費分攤：equal 均分（預設）／proportional 依基礎消費比例 */
+  serviceFeeSplitMode?: 'equal' | 'proportional' | null;
   payerId: string;
   /** 多位代墊者；未填時以 payerId + totalAmount 視為單人代墊 */
   payers?: AdvancePayer[];
